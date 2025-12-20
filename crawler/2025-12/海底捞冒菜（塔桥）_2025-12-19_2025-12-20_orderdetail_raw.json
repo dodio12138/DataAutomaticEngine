@@ -1,0 +1,631 @@
+[
+  {
+    "code": 1,
+    "message": "成功",
+    "data": {
+      "orderSn": "798516801616274835675",
+      "orderSubSn": null,
+      "symbol": "£",
+      "createTime": null,
+      "createTimeStr": "2025-12-19 23:43:22",
+      "isOnlinePay": null,
+      "merFixedPrice": null,
+      "pcOrderStatus": 5,
+      "footCity": null,
+      "details": [
+        {
+          "productName": "自选麻辣烫 Create Your Own 现做现煮(麻辣Spicy/正常Standard甄选牛五花Premium Karubi Beefx2/捞派滑牛肉Marinated Beefx1/虾滑Prawn Pastex1/竹笋尖Bamboo Shoot Tipsx1/大白菜Chinese Cabbagex1/豆苗Pea Shootsx1)",
+          "productImg": "https://static-img.hungrypanda.co/product-img/1739270894653976723875eb4460288a8c1201e721e67.jpeg?x-oss-process=style/prod_detail_refer",
+          "skuName": "麻辣Spicy/正常Standard",
+          "productPrice": 37.6,
+          "productCount": 1
+        }
+      ],
+      "merTaxPrice": 0.0,
+      "tablewarePrice": 0.0,
+      "packingCharges": 0.0,
+      "deliveryPrice": 0.0,
+      "fixedPrice": 33.09,
+      "remark": "",
+      "fullSubRedRespDTO": {
+        "fullSubName": "满30减5",
+        "fullSubPrice": 5.0,
+        "firstDiscountName": "首单优惠",
+        "firstDiscount": 0.0,
+        "redPacketName": "天降惊喜红包3",
+        "redPacketPrice": 2.0
+      },
+      "deliver": {
+        "deliveryType": 1,
+        "deliveryName": "INIessien",
+        "deliveryPhone": "07375787405"
+      },
+      "orderStatus": 6,
+      "orderStatusNew": 6,
+      "orderStatusDesc": "Done",
+      "orderStatusDesk": 3,
+      "showTipPrice": null,
+      "subOrderStatus": null,
+      "tipPrice": null,
+      "isHistoryData": 1,
+      "feeInfoResqDTOList": [
+        {
+          "feeName": "Product breakdown analysis(+)",
+          "feePrice": "37.6",
+          "subFeeList": [
+            {
+              "feeName": "Original Price",
+              "feePrice": "37.6"
+            }
+          ]
+        },
+        {
+          "feeName": "Discounted value by merchant(-)",
+          "feePrice": "10.64",
+          "subFeeList": [
+            {
+              "feeName": "Product Discount",
+              "feePrice": "10.64",
+              "subFeeList": null
+            },
+            {
+              "feeName": "Delivery discount",
+              "feePrice": "0",
+              "subFeeList": null
+            }
+          ]
+        },
+        {
+          "feeName": "GST/VAT(-)",
+          "feePrice": "1.08",
+          "subFeeList": null
+        },
+        {
+          "feeName": "Estimated revenue",
+          "feePrice": "20.48",
+          "subFeeList": null
+        },
+        {
+          "feeName": "revenue before tax",
+          "feePrice": "20.48",
+          "subFeeList": null
+        }
+      ],
+      "tablewareFee": null,
+      "merchantOutMealTime": null,
+      "deliveryTime": "Deliver as Soon as Possible",
+      "merchantOrderAddressResVO": {
+        "consigneeTelMask": "+447****29386",
+        "consigneeFullAddress": "Paris Gardens - iQ Student Accommodation London, Paris Garden, London, UK",
+        "consigneeHouseNumber": "no need",
+        "consigneeZipCode": "SE1 8ND",
+        "consigneeName": "Blake"
+      },
+      "shopType": null
+    },
+    "currencySymbol": null,
+    "queryList": null
+  },
+  {
+    "code": 1,
+    "message": "成功",
+    "data": {
+      "orderSn": "577614075666673818668",
+      "orderSubSn": null,
+      "symbol": "£",
+      "createTime": null,
+      "createTimeStr": "2025-12-19 20:11:15",
+      "isOnlinePay": null,
+      "merFixedPrice": null,
+      "pcOrderStatus": 5,
+      "footCity": null,
+      "details": [
+        {
+          "productName": "特色滑牛麻辣烫套餐 [3荤4素]现做现煮 （含饮料）(麻辣（正常辣）Mala Spicy ( Standard )/米饭 Rice/加多宝x1)",
+          "productImg": "https://static-img.hungrypanda.co/product-img/17511644220049f61e573c3414701bf65031cae2cf17a.jpeg?x-oss-process=style/prod_detail_refer",
+          "skuName": "麻辣（正常辣）Mala Spicy ( Standard )/米饭 Rice",
+          "productPrice": 18.99,
+          "productCount": 1
+        }
+      ],
+      "merTaxPrice": 0.0,
+      "tablewarePrice": 0.0,
+      "packingCharges": 0.0,
+      "deliveryPrice": 1.79,
+      "fixedPrice": 22.49,
+      "remark": "",
+      "fullSubRedRespDTO": {
+        "fullSubName": null,
+        "fullSubPrice": null,
+        "firstDiscountName": "首单优惠",
+        "firstDiscount": 0.0,
+        "redPacketName": null,
+        "redPacketPrice": null
+      },
+      "deliver": {
+        "deliveryType": 1,
+        "deliveryName": "【SBX】jose VALDEZ ",
+        "deliveryPhone": "07897079733"
+      },
+      "orderStatus": 6,
+      "orderStatusNew": 6,
+      "orderStatusDesc": "Done",
+      "orderStatusDesk": 3,
+      "showTipPrice": null,
+      "subOrderStatus": null,
+      "tipPrice": null,
+      "isHistoryData": 1,
+      "feeInfoResqDTOList": [
+        {
+          "feeName": "Product breakdown analysis(+)",
+          "feePrice": "18.99",
+          "subFeeList": [
+            {
+              "feeName": "Original Price",
+              "feePrice": "18.99"
+            }
+          ]
+        },
+        {
+          "feeName": "Discounted value by merchant(-)",
+          "feePrice": "2.85",
+          "subFeeList": [
+            {
+              "feeName": "Delivery discount",
+              "feePrice": "0",
+              "subFeeList": null
+            }
+          ]
+        },
+        {
+          "feeName": "GST/VAT(-)",
+          "feePrice": "0.647",
+          "subFeeList": null
+        },
+        {
+          "feeName": "Estimated revenue",
+          "feePrice": "12.26",
+          "subFeeList": null
+        },
+        {
+          "feeName": "revenue before tax",
+          "feePrice": "12.26",
+          "subFeeList": null
+        }
+      ],
+      "tablewareFee": null,
+      "merchantOutMealTime": null,
+      "deliveryTime": "Deliver as Soon as Possible",
+      "merchantOrderAddressResVO": {
+        "consigneeTelMask": "+447****34640",
+        "consigneeFullAddress": "42 Weston St, London, UK",
+        "consigneeHouseNumber": "31",
+        "consigneeZipCode": "SE1 3QD",
+        "consigneeName": "Zhang"
+      },
+      "shopType": null
+    },
+    "currencySymbol": null,
+    "queryList": null
+  },
+  {
+    "code": 1,
+    "message": "成功",
+    "data": {
+      "orderSn": "996713412666270658661",
+      "orderSubSn": null,
+      "symbol": "£",
+      "createTime": null,
+      "createTimeStr": "2025-12-19 18:36:52",
+      "isOnlinePay": null,
+      "merFixedPrice": null,
+      "pcOrderStatus": 5,
+      "footCity": null,
+      "details": [
+        {
+          "productName": "原汤肥牛烫捞杯(标准/番茄口味)",
+          "productImg": "https://static-img.hungrypanda.co/product-img/175951404803889db12e8925f48fc8bb176ebaff5362c.jpg?x-oss-process=style/prod_detail_refer",
+          "skuName": "标准/番茄口味",
+          "productPrice": 15.99,
+          "productCount": 1
+        }
+      ],
+      "merTaxPrice": 0.0,
+      "tablewarePrice": 0.0,
+      "packingCharges": 0.0,
+      "deliveryPrice": null,
+      "fixedPrice": 15.19,
+      "remark": "",
+      "fullSubRedRespDTO": {
+        "fullSubName": null,
+        "fullSubPrice": null,
+        "firstDiscountName": "首单优惠",
+        "firstDiscount": 0.0,
+        "redPacketName": null,
+        "redPacketPrice": null
+      },
+      "deliver": {
+        "deliveryType": 1,
+        "deliveryName": "【ELX】ShayanTariq",
+        "deliveryPhone": "07493617638"
+      },
+      "orderStatus": 6,
+      "orderStatusNew": 6,
+      "orderStatusDesc": "Done",
+      "orderStatusDesk": 3,
+      "showTipPrice": null,
+      "subOrderStatus": null,
+      "tipPrice": null,
+      "isHistoryData": 1,
+      "feeInfoResqDTOList": [
+        {
+          "feeName": "Product breakdown analysis(+)",
+          "feePrice": "15.99",
+          "subFeeList": [
+            {
+              "feeName": "Original Price",
+              "feePrice": "15.99"
+            }
+          ]
+        },
+        {
+          "feeName": "Discounted value by merchant(-)",
+          "feePrice": "0",
+          "subFeeList": [
+            {
+              "feeName": "Delivery discount",
+              "feePrice": "0",
+              "subFeeList": null
+            }
+          ]
+        },
+        {
+          "feeName": "GST/VAT(-)",
+          "feePrice": "1.367",
+          "subFeeList": null
+        },
+        {
+          "feeName": "Estimated revenue",
+          "feePrice": "6.99",
+          "subFeeList": null
+        },
+        {
+          "feeName": "revenue before tax",
+          "feePrice": "6.99",
+          "subFeeList": null
+        }
+      ],
+      "tablewareFee": null,
+      "merchantOutMealTime": null,
+      "deliveryTime": "Deliver as Soon as Possible",
+      "merchantOrderAddressResVO": {
+        "consigneeTelMask": "+447****28688",
+        "consigneeFullAddress": "Moonraker Point, KCL, Pocock Street, London, UK",
+        "consigneeHouseNumber": "C",
+        "consigneeZipCode": "SE1 0FN",
+        "consigneeName": "Lis"
+      },
+      "shopType": null
+    },
+    "currencySymbol": null,
+    "queryList": null
+  },
+  {
+    "code": 1,
+    "message": "成功",
+    "data": {
+      "orderSn": "676614254606277424654",
+      "orderSubSn": null,
+      "symbol": "£",
+      "createTime": null,
+      "createTimeStr": "2025-12-19 17:44:14",
+      "isOnlinePay": null,
+      "merFixedPrice": null,
+      "pcOrderStatus": 5,
+      "footCity": null,
+      "details": [
+        {
+          "productName": "海底捞特色毛肚麻辣烫套餐 Beef Tripe Mini Pot Set Meal(麻辣口味Mala Spicy/特辣Extra Hot/Spicy/米饭 Rice/可口可乐 Coca Colax1)",
+          "productImg": "https://static-img.hungrypanda.co/product-img/1751163151851d7e19f0aa0e3489e8bebe05d3eefaa41.jpeg?x-oss-process=style/prod_detail_refer",
+          "skuName": "麻辣口味Mala Spicy/特辣Extra Hot/Spicy/米饭 Rice",
+          "productPrice": 18.8,
+          "productCount": 1
+        }
+      ],
+      "merTaxPrice": 0.0,
+      "tablewarePrice": 0.0,
+      "packingCharges": 0.0,
+      "deliveryPrice": 0.29,
+      "fixedPrice": 20.78,
+      "remark": "",
+      "fullSubRedRespDTO": {
+        "fullSubName": null,
+        "fullSubPrice": null,
+        "firstDiscountName": "首单优惠",
+        "firstDiscount": 0.0,
+        "redPacketName": null,
+        "redPacketPrice": null
+      },
+      "deliver": {
+        "deliveryType": 1,
+        "deliveryName": "RinitPatel",
+        "deliveryPhone": "07404599675"
+      },
+      "orderStatus": 7,
+      "orderStatusNew": 7,
+      "orderStatusDesc": "Done",
+      "orderStatusDesk": 3,
+      "showTipPrice": null,
+      "subOrderStatus": null,
+      "tipPrice": null,
+      "isHistoryData": 1,
+      "feeInfoResqDTOList": [
+        {
+          "feeName": "Product breakdown analysis(+)",
+          "feePrice": "18.8",
+          "subFeeList": [
+            {
+              "feeName": "Original Price",
+              "feePrice": "18.8"
+            }
+          ]
+        },
+        {
+          "feeName": "Discounted value by merchant(-)",
+          "feePrice": "2.82",
+          "subFeeList": [
+            {
+              "feeName": "Delivery discount",
+              "feePrice": "0",
+              "subFeeList": null
+            }
+          ]
+        },
+        {
+          "feeName": "GST/VAT(-)",
+          "feePrice": "0.64",
+          "subFeeList": null
+        },
+        {
+          "feeName": "Estimated revenue",
+          "feePrice": "12.14",
+          "subFeeList": null
+        },
+        {
+          "feeName": "revenue before tax",
+          "feePrice": "12.14",
+          "subFeeList": null
+        }
+      ],
+      "tablewareFee": null,
+      "merchantOutMealTime": null,
+      "deliveryTime": "Deliver as Soon as Possible",
+      "merchantOrderAddressResVO": {
+        "consigneeTelMask": "+447****07464",
+        "consigneeFullAddress": "Pocock Street, Southwark, London,  United Kingdom",
+        "consigneeHouseNumber": "block c,floor 2,room 172",
+        "consigneeZipCode": "SE1 0FN",
+        "consigneeName": "Li"
+      },
+      "shopType": null
+    },
+    "currencySymbol": null,
+    "queryList": null
+  },
+  {
+    "code": 1,
+    "message": "成功",
+    "data": {
+      "orderSn": "286413678676477221647",
+      "orderSubSn": null,
+      "symbol": "£",
+      "createTime": null,
+      "createTimeStr": "2025-12-19 16:44:38",
+      "isOnlinePay": null,
+      "merFixedPrice": null,
+      "pcOrderStatus": 5,
+      "footCity": null,
+      "details": [
+        {
+          "productName": "自选麻辣烫 Create Your Own 现做现煮(麻辣麻酱干拌ben[a meal in a partitioned box]/特辣Extra Hot/Spicy捞派滑牛肉Marinated Beefx2/新西兰羊肉New Zealand Lamb Shoulderx4/鲜苕粉Yam Vermicellix2/魔芋丝Konjac Threadx2/米饭Ricex1)",
+          "productImg": "https://static-img.hungrypanda.co/product-img/1739270894653976723875eb4460288a8c1201e721e67.jpeg?x-oss-process=style/prod_detail_refer",
+          "skuName": "麻辣麻酱干拌ben[a meal in a partitioned box]/特辣Extra Hot/Spicy",
+          "productPrice": 39.39,
+          "productCount": 1
+        },
+        {
+          "productName": "粒粒分明白米饭Steamed Rice(标准)",
+          "productImg": "https://static-img.hungrypanda.co/product-img/17603501764594e313b79da9f44f38f4b1ea0c6035fb6.jpg?x-oss-process=style/prod_detail",
+          "skuName": "标准",
+          "productPrice": 5.98,
+          "productCount": 2
+        }
+      ],
+      "merTaxPrice": 0.0,
+      "tablewarePrice": 0.0,
+      "packingCharges": 0.0,
+      "deliveryPrice": 0.0,
+      "fixedPrice": 42.86,
+      "remark": "",
+      "fullSubRedRespDTO": {
+        "fullSubName": "满30减5",
+        "fullSubPrice": 5.0,
+        "firstDiscountName": "首单优惠",
+        "firstDiscount": 0.0,
+        "redPacketName": null,
+        "redPacketPrice": null
+      },
+      "deliver": {
+        "deliveryType": 1,
+        "deliveryName": "【WELX】SutonPanda",
+        "deliveryPhone": "07765611061"
+      },
+      "orderStatus": 6,
+      "orderStatusNew": 6,
+      "orderStatusDesc": "Done",
+      "orderStatusDesk": 3,
+      "showTipPrice": null,
+      "subOrderStatus": null,
+      "tipPrice": null,
+      "isHistoryData": 1,
+      "feeInfoResqDTOList": [
+        {
+          "feeName": "Product breakdown analysis(+)",
+          "feePrice": "45.37",
+          "subFeeList": [
+            {
+              "feeName": "Original Price",
+              "feePrice": "45.37"
+            }
+          ]
+        },
+        {
+          "feeName": "Discounted value by merchant(-)",
+          "feePrice": "11",
+          "subFeeList": [
+            {
+              "feeName": "Product Discount",
+              "feePrice": "11",
+              "subFeeList": null
+            },
+            {
+              "feeName": "Delivery discount",
+              "feePrice": "0",
+              "subFeeList": null
+            }
+          ]
+        },
+        {
+          "feeName": "GST/VAT(-)",
+          "feePrice": "1.375",
+          "subFeeList": null
+        },
+        {
+          "feeName": "Estimated revenue",
+          "feePrice": "26.12",
+          "subFeeList": null
+        },
+        {
+          "feeName": "revenue before tax",
+          "feePrice": "26.12",
+          "subFeeList": null
+        }
+      ],
+      "tablewareFee": null,
+      "merchantOutMealTime": null,
+      "deliveryTime": "Deliver as Soon as Possible",
+      "merchantOrderAddressResVO": {
+        "consigneeTelMask": "+447****09484",
+        "consigneeFullAddress": "Weston Street, London SE1 3QJ, UK",
+        "consigneeHouseNumber": "2806，48-50 Weston Street",
+        "consigneeZipCode": "SE1 3QJ",
+        "consigneeName": "王"
+      },
+      "shopType": null
+    },
+    "currencySymbol": null,
+    "queryList": null
+  },
+  {
+    "code": 1,
+    "message": "成功",
+    "data": {
+      "orderSn": "540317968696272486640",
+      "orderSubSn": null,
+      "symbol": "£",
+      "createTime": null,
+      "createTimeStr": "2025-12-19 00:59:28",
+      "isOnlinePay": null,
+      "merFixedPrice": null,
+      "pcOrderStatus": 5,
+      "footCity": null,
+      "details": [
+        {
+          "productName": "招牌虾滑烫捞杯(标准/番茄口味)",
+          "productImg": "https://static-img.hungrypanda.co/product-img/1759513808310f80761db22fc4c78a01f9d683ebba8fb.jpg?x-oss-process=style/prod_detail_refer",
+          "skuName": "标准/番茄口味",
+          "productPrice": 15.99,
+          "productCount": 1
+        }
+      ],
+      "merTaxPrice": 0.0,
+      "tablewarePrice": 0.0,
+      "packingCharges": 0.0,
+      "deliveryPrice": null,
+      "fixedPrice": 15.19,
+      "remark": "",
+      "fullSubRedRespDTO": {
+        "fullSubName": null,
+        "fullSubPrice": null,
+        "firstDiscountName": "首单优惠",
+        "firstDiscount": 0.0,
+        "redPacketName": null,
+        "redPacketPrice": null
+      },
+      "deliver": {
+        "deliveryType": 1,
+        "deliveryName": "【WELX】SutonPanda",
+        "deliveryPhone": "07765611061"
+      },
+      "orderStatus": 6,
+      "orderStatusNew": 6,
+      "orderStatusDesc": "Done",
+      "orderStatusDesk": 3,
+      "showTipPrice": null,
+      "subOrderStatus": null,
+      "tipPrice": null,
+      "isHistoryData": 1,
+      "feeInfoResqDTOList": [
+        {
+          "feeName": "Product breakdown analysis(+)",
+          "feePrice": "15.99",
+          "subFeeList": [
+            {
+              "feeName": "Original Price",
+              "feePrice": "15.99"
+            }
+          ]
+        },
+        {
+          "feeName": "Discounted value by merchant(-)",
+          "feePrice": "0",
+          "subFeeList": [
+            {
+              "feeName": "Delivery discount",
+              "feePrice": "0",
+              "subFeeList": null
+            }
+          ]
+        },
+        {
+          "feeName": "GST/VAT(-)",
+          "feePrice": "1.367",
+          "subFeeList": null
+        },
+        {
+          "feeName": "Estimated revenue",
+          "feePrice": "6.99",
+          "subFeeList": null
+        },
+        {
+          "feeName": "revenue before tax",
+          "feePrice": "6.99",
+          "subFeeList": null
+        }
+      ],
+      "tablewareFee": null,
+      "merchantOutMealTime": null,
+      "deliveryTime": "Deliver as Soon as Possible",
+      "merchantOrderAddressResVO": {
+        "consigneeTelMask": "+447****19473",
+        "consigneeFullAddress": "Moonraker Point, KCL, Pocock Street, London, UK",
+        "consigneeHouseNumber": "reception",
+        "consigneeZipCode": "SE1 0FN",
+        "consigneeName": "yang"
+      },
+      "shopType": null
+    },
+    "currencySymbol": null,
+    "queryList": null
+  }
+]

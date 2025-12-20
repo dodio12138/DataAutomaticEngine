@@ -1,0 +1,75 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: delivery_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: delivery_data
+      POSTGRES_USER: delivery_user
+      POSTGRES_PASSWORD: delivery_pass
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U delivery_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  crawler:
+    build: ./crawler
+    container_name: delivery_crawler
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - ./crawler:/app
+    shm_size: 2gb
+    restart: "no"     # 关键：不常驻
+    command: python main.py
+
+  etl:
+    build: ./etl
+    container_name: delivery_etl
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - ./etl:/app
+    restart: "no"
+    command: python main.py
+
+  api:
+    build: ./api
+    container_name: delivery_api
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - ./api:/app
+      - /var/run/docker.sock:/var/run/docker.sock  # ★关键
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+
+  scheduler:
+    build: ./scheduler
+    container_name: delivery_scheduler
+    depends_on:
+      - api
+    volumes:
+      - ./scheduler/crontab:/etc/crontabs/root
+    restart: unless-stopped
+volumes:
+  pg_data:
