@@ -1,0 +1,25 @@
+=== Crawler Log ===
+Timestamp: 20251221_023214
+Parameters: {'DB_HOST': 'db', 'DB_PORT': '5432', 'DB_NAME': 'delivery_data', 'DB_USER': 'delivery_user', 'DB_PASSWORD': 'delivery_pass', 'STORE_CODE': 'battersea_maocai'}
+Exit Code: {'StatusCode': 0}
+===================
+
+开始爬取店铺：海底捞冒菜（巴特西）（battersea_maocai） 时间：2025-12-20 - 2025-12-21
+等待分页元素加载...
+Processing page 1/85
+点击订单详情，准备捕获 XHR（订单时间: 2025-12-20 19:36:53）...
+捕获到原始详情（最新匹配）来自 URL: https://api-uk-f2e.hungrypanda.vip/api/merchant/order/detail 订单时间: 2025-12-20 19:36:53
+点击订单详情，准备捕获 XHR（订单时间: 2025-12-20 18:32:11）...
+捕获到原始详情（最新匹配）来自 URL: https://api-uk-f2e.hungrypanda.vip/api/merchant/order/detail 订单时间: 2025-12-20 18:32:11
+点击订单详情，准备捕获 XHR（订单时间: 2025-12-20 18:29:43）...
+捕获到原始详情（最新匹配）来自 URL: https://api-uk-f2e.hungrypanda.vip/api/merchant/order/detail 订单时间: 2025-12-20 18:29:43
+点击订单详情，准备捕获 XHR（订单时间: 2025-12-20 18:08:32）...
+捕获到原始详情（最新匹配）来自 URL: https://api-uk-f2e.hungrypanda.vip/api/merchant/order/detail 订单时间: 2025-12-20 18:08:32
+点击订单详情，准备捕获 XHR（订单时间: 2025-12-20 12:18:11）...
+捕获到原始详情（最新匹配）来自 URL: https://api-uk-f2e.hungrypanda.vip/api/merchant/order/detail 订单时间: 2025-12-20 12:18:11
+点击订单详情，准备捕获 XHR（订单时间: 2025-12-20 10:59:06）...
+捕获到原始详情（最新匹配）来自 URL: https://api-uk-f2e.hungrypanda.vip/api/merchant/order/detail 订单时间: 2025-12-20 10:59:06
+成功保存 6 条原始详情到：./2025-12/海底捞冒菜（巴特西）_2025-12-20_2025-12-21_orderdetail_raw.json
+保存完成，写入 0 条记录
+已写入数据库 0 条订单（前一天过滤、去重后）
+总运行时间: 22.03秒

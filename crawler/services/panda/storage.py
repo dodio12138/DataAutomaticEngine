@@ -7,7 +7,7 @@
 import os
 import datetime
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from utils.db import get_conn
 
 
@@ -45,7 +45,7 @@ def _is_previous_day(dt: datetime.datetime, reference: datetime.date = None) -> 
     return d == (reference - datetime.timedelta(days=1))
 
 
-def save_orders_to_db(raw_list: List[Dict[str, Any]], platform: str = 'panda', start_time: datetime.datetime = None, end_time: datetime.datetime = None) -> int:
+def save_orders_to_db(raw_list: List[Dict[str, Any]], platform: str = 'panda', start_time: Optional[datetime.datetime] = None, end_time: Optional[datetime.datetime] = None, store_code: Optional[str] = None, store_name: Optional[str] = None) -> int:
     """把原始订单数组拆分并写入 PostgreSQL。
 
     行为：
@@ -70,6 +70,8 @@ def save_orders_to_db(raw_list: List[Dict[str, Any]], platform: str = 'panda', s
             CREATE TABLE IF NOT EXISTS raw_orders (
                 id SERIAL PRIMARY KEY,
                 platform TEXT NOT NULL,
+                store_code TEXT,
+                store_name TEXT,
                 order_id TEXT NOT NULL,
                 payload JSONB NOT NULL,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
@@ -131,10 +133,16 @@ def save_orders_to_db(raw_list: List[Dict[str, Any]], platform: str = 'panda', s
                     continue
 
                 # payload 使用原始 item（保持 data 包装结构），以便后续调试与解析
-                cur.execute(
-                    "INSERT INTO raw_orders (platform, order_id, payload) VALUES (%s, %s, %s)",
-                    (platform, order_id, json.dumps(item))
-                )
+                if store_code or store_name:
+                    cur.execute(
+                        "INSERT INTO raw_orders (platform, store_code, store_name, order_id, payload) VALUES (%s, %s, %s, %s, %s)",
+                        (platform, store_code, store_name, order_id, json.dumps(item))
+                    )
+                else:
+                    cur.execute(
+                        "INSERT INTO raw_orders (platform, order_id, payload) VALUES (%s, %s, %s)",
+                        (platform, order_id, json.dumps(item))
+                    )
                 if cur.rowcount > 0:
                     inserted += cur.rowcount
             except Exception as e:

@@ -19,32 +19,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-  crawler:
-    build: ./crawler
-    container_name: delivery_crawler
-    depends_on:
-      db:
-        condition: service_healthy
-    env_file:
-      - .env
-    volumes:
-      - ./crawler:/app
-    shm_size: 2gb
-    restart: "no"     # 关键：不常驻
-    command: python main.py
-
-  etl:
-    build: ./etl
-    container_name: delivery_etl
-    depends_on:
-      db:
-        condition: service_healthy
-    env_file:
-      - .env
-    volumes:
-      - ./etl:/app
-    restart: "no"
-    command: python main.py
 
   api:
     build: ./api
@@ -56,6 +30,7 @@ services:
       - .env
     volumes:
       - ./api:/app
+      - ./api/logs:/app/logs  # 日志目录
       - /var/run/docker.sock:/var/run/docker.sock  # ★关键
     ports:
       - "8000:8000"
@@ -70,6 +45,7 @@ services:
       - api
     volumes:
       - ./scheduler/crontab:/etc/crontabs/root
+      - ./api/logs:/app/logs  # 日志目录共享
     restart: unless-stopped
 volumes:
   pg_data:

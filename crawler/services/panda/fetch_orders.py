@@ -12,6 +12,7 @@ from .selectors import SELECTORS
 from .login import init_browser, do_login
 from store_config import store_dict_panda
 from .storage import save_raw_json
+from store_config import store_name_to_code
 
 
 class HungryPandaScraper:
@@ -263,7 +264,15 @@ class HungryPandaScraper:
             from .storage import save_orders_to_db
             valid_objs = [obj for obj in raw_objects if isinstance(obj, dict)]
             if valid_objs:
-                inserted = save_orders_to_db(valid_objs, platform='panda', start_time=self.start_time, end_time=self.end_time)
+                code = store_name_to_code.get(self.store_name)
+                inserted = save_orders_to_db(
+                    valid_objs,
+                    platform='panda',
+                    start_time=self.start_time,
+                    end_time=self.end_time,
+                    store_code=code,
+                    store_name=self.store_name,
+                )
                 print(f"已写入数据库 {inserted} 条订单（前一天过滤、去重后）")
             else:
                 print("未发现可写入数据库的原始详情（全部为 None 或解析失败）")

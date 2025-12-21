@@ -1,1 +1,1 @@
-0 2 * * * /bin/bash -c 'sleep $((RANDOM % 3600)) && curl -X POST http://api:8000/run/crawler'
+0 2 * * * /bin/bash -c 'sleep $((RANDOM % 300)) && curl -s -X POST http://api:8000/run/crawler -H "Content-Type: application/json" -d "{\\\"store_code\\\":\\\"all\\\"}"'
