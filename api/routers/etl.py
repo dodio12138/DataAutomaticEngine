@@ -39,6 +39,10 @@ def run_etl():
             environment=env_dict,
             network="dataautomaticengine_default",  # 连接到 docker-compose 网络
             working_dir="/app",
+            labels={
+                "com.docker.compose.project": "dataautomaticengine",
+                "com.docker.compose.service": "etl-temp"
+            },
             remove=True,  # 执行完后自动删除容器
             detach=True  # 后台运行
         )

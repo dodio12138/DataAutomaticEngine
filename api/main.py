@@ -1,7 +1,7 @@
 """FastAPI 应用主入口"""
 from fastapi import FastAPI
 from utils import get_db_conn
-from routers import crawler, etl
+from routers import crawler, etl, reminder
 
 app = FastAPI(
     title="数据自动化引擎 API",
@@ -12,6 +12,7 @@ app = FastAPI(
 # 注册路由
 app.include_router(crawler.router)
 app.include_router(etl.router)
+app.include_router(reminder.router)
 
 
 @app.get("/")
@@ -24,6 +25,7 @@ def root():
             "health": "/health",
             "crawler": "/run/crawler",
             "etl": "/run/etl",
+            "reminder": "/reminder/*"
         }
     }
 

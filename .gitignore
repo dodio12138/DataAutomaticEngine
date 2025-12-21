@@ -1,5 +1,63 @@
-*__pycache__/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+*.pyc
+*.pyo
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
 .idea/
 .vscode/
-*.pyc
-/api/__pycache__
+*.swp
+*.swo
+*~
+
+# Environment Variables
+# .env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+api/logs/*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+db_data/
+
+# Docker
+# 注意：docker-compose.yaml 和 Dockerfile 需要保留
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Test Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Temporary Files
+*.tmp
+*.bak
+*.swp
+*~.nib
