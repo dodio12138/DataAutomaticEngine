@@ -104,7 +104,7 @@ docker logs delivery_api -f --tail 50
 **解决方案：**
 - 检查网络稳定性
 - 检查 App Secret 是否正确
-- 重启 API 容器：`docker-compose restart api`
+- 重启 API 容器：`docker compose restart api`
 
 ### Q2: 收不到消息事件
 **现象：** 只有 ping/pong，没有消息事件

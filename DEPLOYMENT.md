@@ -157,7 +157,7 @@ docker logs -f delivery_api
 ### 查看日志
 ```bash
 # 所有服务日志
-docker-compose logs -f
+docker compose logs -f
 
 # API 服务日志
 docker logs -f delivery_api
@@ -171,7 +171,7 @@ docker logs -f delivery_scheduler
 
 ### 查看服务状态
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 ### 进入容器
@@ -258,7 +258,7 @@ docker restart delivery_api
 ### 减少重建时间
 ```bash
 # 仅重建 API（最常修改）
-docker-compose build api && docker-compose up -d api
+docker compose build api && docker compose up -d api
 
 # 仅重建 Crawler
 docker build -t dataautomaticengine-crawler ./crawler
@@ -295,7 +295,7 @@ cat backup_20251223.sql | docker exec -i delivery_postgres psql -U delivery_user
 ## 生产环境部署
 
 ### 关闭自动重载（提升性能）
-修改 [docker-compose.yaml](docker-compose.yaml)：
+修改 [docker compose.yaml](docker compose.yaml)：
 ```yaml
 api:
   command: uvicorn main:app --host 0.0.0.0 --port 8000
@@ -309,7 +309,7 @@ cp .env .env.prod
 # 修改 .env.prod 中的配置
 
 # 使用生产配置启动
-docker-compose --env-file .env.prod up -d
+docker compose --env-file .env.prod up -d
 ```
 
 ---

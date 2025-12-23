@@ -296,7 +296,7 @@ curl -X POST http://localhost:8000/feishu/bot/callback \
 
 **排查步骤：**
 1. 检查 `.env` 中的 `FEISHU_ENCRYPT_KEY` 是否正确
-2. 确认 API 容器已重启：`docker-compose up -d --force-recreate api`
+2. 确认 API 容器已重启：`docker compose up -d --force-recreate api`
 3. 查看日志：`docker logs delivery_api --tail 50`
 
 ### 错误：未找到数据

@@ -17,7 +17,7 @@ def run_etl():
     逻辑：
     - 检查镜像是否存在，不存在则自动构建
     - 构建环境变量（包括 DB 连接信息）
-    - 创建临时容器执行 ETL（连接到 docker-compose 网络）
+    - 创建临时容器执行 ETL（连接到 docker compose 网络）
     - 保存日志到 /app/logs
     """
     # 确保镜像存在
@@ -32,12 +32,12 @@ def run_etl():
     container_name = f"etl_{timestamp}"  # 固定命名格式
 
     try:
-        # 创建临时容器（连接到 docker-compose 网络）
+        # 创建临时容器（连接到 docker compose 网络）
         container = client.containers.run(
             image="dataautomaticengine-etl",  # 使用编译的镜像名
             name=container_name,  # 设置容器名
             environment=env_dict,
-            network="dataautomaticengine_default",  # 连接到 docker-compose 网络
+            network="dataautomaticengine_default",  # 连接到 docker compose 网络
             working_dir="/app",
             labels={
                 "com.docker.compose.project": "dataautomaticengine",

@@ -8,7 +8,7 @@ echo "⚡ 快速重启 API 容器..."
 cd /Users/levy/WorkSpace/Program/HaidilaoService/DataAutomaticEngine
 
 # 重启容器（利用 --reload 模式，代码会自动重载）
-docker-compose restart api
+docker compose restart api
 
 echo ""
 echo "⏳ 等待服务启动..."

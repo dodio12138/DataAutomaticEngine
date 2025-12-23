@@ -82,7 +82,7 @@ confirm_action() {
 # 停止所有容器
 stop_containers() {
     echo -e "${BLUE}[1/7]${NC} 停止所有容器..."
-    docker-compose down 2>/dev/null || echo "没有运行中的容器"
+    docker compose down 2>/dev/null || echo "没有运行中的容器"
     echo -e "${GREEN}✅ 容器已停止${NC}"
     echo ""
 }
@@ -123,7 +123,7 @@ remove_images() {
 # 删除所有数据卷
 remove_volumes() {
     echo -e "${BLUE}[4/7]${NC} ${RED}删除所有数据卷（包括数据库数据）...${NC}"
-    docker-compose down -v 2>/dev/null || true
+    docker compose down -v 2>/dev/null || true
     
     # 删除项目相关的数据卷
     volumes=$(docker volume ls -q | grep -E "dataautomaticengine|delivery" 2>/dev/null || true)
@@ -152,7 +152,7 @@ rebuild_images() {
     
     # 构建 API 镜像
     echo "📦 1/4 构建 API 镜像..."
-    docker-compose build --no-cache api
+    docker compose build --no-cache api
     echo -e "${GREEN}✅ API 镜像构建完成${NC}"
     echo ""
     
@@ -170,7 +170,7 @@ rebuild_images() {
     
     # 构建 Scheduler 镜像
     echo "📦 4/4 构建 Scheduler 镜像..."
-    docker-compose build --no-cache scheduler
+    docker compose build --no-cache scheduler
     echo -e "${GREEN}✅ Scheduler 镜像构建完成${NC}"
     
     echo "============================================================"
@@ -181,7 +181,7 @@ rebuild_images() {
 # 启动所有容器
 start_containers() {
     echo -e "${BLUE}[7/7]${NC} 启动所有服务..."
-    docker-compose up -d
+    docker compose up -d
     echo -e "${GREEN}✅ 所有服务已启动${NC}"
     echo ""
 }
@@ -237,7 +237,7 @@ show_status() {
     echo "============================================================"
     echo -e "${GREEN}📊 服务状态：${NC}"
     echo "============================================================"
-    docker-compose ps
+    docker compose ps
     echo ""
 }
 

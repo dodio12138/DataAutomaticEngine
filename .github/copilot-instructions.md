@@ -25,7 +25,7 @@
 ### Local Development & Debugging
 1. **启动完整堆栈：**
    ```bash
-   docker-compose up -d
+   docker compose up -d
    # API 可访问 http://localhost:8000
    # PostgreSQL 可访问 localhost:5432
    ```
@@ -40,11 +40,11 @@
 3. **监控日志：**
    - API容器日志：`docker logs delivery_api`
    - 爬虫日志：`tail -f api/logs/crawler_*.log`（临时容器的输出）
-   - 数据库连接问题：检查 `.env` 中的 `DB_HOST/DB_PORT/DB_NAME` 是否与 docker-compose.yaml 一致
+   - 数据库连接问题：检查 `.env` 中的 `DB_HOST/DB_PORT/DB_NAME` 是否与 docker compose.yaml 一致
 
 ### Docker Network Communication
 - API、Crawler、ETL 通过 `dataautomaticengine_default` 网络通信
-- 从容器内部连接数据库：使用 `DB_HOST=db`（docker-compose 服务名）
+- 从容器内部连接数据库：使用 `DB_HOST=db`（docker compose 服务名）
 - 从主机连接数据库：使用 `DB_HOST=localhost` 或 `127.0.0.1`
 - **关键：** API容器挂载 `/var/run/docker.sock` 以支持动态容器创建
 
@@ -100,7 +100,7 @@ STORE_NAME (中文名)  → 通过 store_name_to_code 映射
 所有临时容器的日志持久化到主机：
 ```python
 log_file = os.path.join(LOG_DIR, f"crawler_{timestamp}.log")
-# LOG_DIR = "/app/logs" → 挂载 docker-compose 的 ./api/logs
+# LOG_DIR = "/app/logs" → 挂载 docker compose 的 ./api/logs
 ```
 **约定：** 容器失败时，从 `api/logs/` 目录查看历史日志，日志文件名格式为 `{service}_{YYYYMMDD_HHMMSS}.log`
 
@@ -151,7 +151,7 @@ FEISHU_BOT_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
 
 | 问题 | 原因 | 解决方案 |
 |-----|------|--------|
-| `DB connection timeout` | 容器内 DB_HOST 错误或数据库未启动 | 检查 .env 中 DB_HOST=db，确保 `docker-compose up` 时 db 容器健康 |
+| `DB connection timeout` | 容器内 DB_HOST 错误或数据库未启动 | 检查 .env 中 DB_HOST=db，确保 `docker compose up` 时 db 容器健康 |
 | `Image not found` | 镜像未构建 | API 的 `ensure_image_exists()` 会自动构建，或手动 `docker build` |
 | `Network error in crawler` | Selenium 网络隔离 | Crawler 容器需共享宿主网络或配置代理 |
 | `Store code not found` | store_code_map 中无此映射 | 在 [store_config.py](crawler/store_config.py) 中新增店铺映射 |

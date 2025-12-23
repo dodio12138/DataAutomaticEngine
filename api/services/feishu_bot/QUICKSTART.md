@@ -23,7 +23,7 @@ api/
 ### 1. 启动服务
 ```bash
 cd /Users/levy/WorkSpace/Program/HaidilaoService/DataAutomaticEngine
-docker-compose up -d
+docker compose up -d
 ```
 
 ### 2. 运行测试脚本

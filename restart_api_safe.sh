@@ -10,7 +10,7 @@ echo ""
 
 # 1. 停止容器（不等待，立即返回）
 echo "1️⃣ 停止现有容器..."
-docker-compose stop api 2>/dev/null || true
+docker compose stop api 2>/dev/null || true
 docker rm -f delivery_api 2>/dev/null || true
 
 # 2. 清理缓存文件（避免触发过多文件监控事件）
@@ -21,7 +21,7 @@ find /Users/levy/WorkSpace/Program/HaidilaoService/DataAutomaticEngine/api -type
 # 3. 后台构建（不阻塞终端）
 echo "3️⃣ 构建镜像（后台运行）..."
 cd /Users/levy/WorkSpace/Program/HaidilaoService/DataAutomaticEngine
-docker-compose build api --quiet &
+docker compose build api --quiet &
 BUILD_PID=$!
 
 # 4. 显示进度
@@ -35,7 +35,7 @@ echo " ✅"
 
 # 5. 启动容器
 echo "4️⃣ 启动容器..."
-docker-compose up -d api
+docker compose up -d api
 
 # 6. 等待服务就绪
 echo "5️⃣ 等待服务启动..."

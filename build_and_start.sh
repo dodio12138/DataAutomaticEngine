@@ -69,8 +69,8 @@ check_env_file() {
 # 停止现有容器
 stop_containers() {
     log_info "停止现有容器..."
-    if docker-compose ps -q > /dev/null 2>&1; then
-        docker-compose down
+    if docker compose ps -q > /dev/null 2>&1; then
+        docker compose down
         log_success "现有容器已停止"
     else
         log_info "没有运行中的容器"
@@ -85,7 +85,7 @@ build_images() {
     
     # 构建 API 镜像
     log_info "1/4 构建 API 镜像..."
-    docker-compose build api
+    docker compose build api
     log_success "API 镜像构建完成"
     
     # 构建 Crawler 镜像
@@ -100,7 +100,7 @@ build_images() {
     
     # 构建 Scheduler 镜像
     log_info "4/4 构建 Scheduler 镜像..."
-    docker-compose build scheduler
+    docker compose build scheduler
     log_success "Scheduler 镜像构建完成"
     
     echo "============================================================"
@@ -111,7 +111,7 @@ build_images() {
 # 启动所有容器
 start_containers() {
     log_info "启动所有容器..."
-    docker-compose up -d
+    docker compose up -d
     log_success "所有容器已启动"
 }
 
@@ -166,7 +166,7 @@ show_status() {
     echo "============================================================"
     log_info "服务状态："
     echo "============================================================"
-    docker-compose ps
+    docker compose ps
     echo ""
 }
 
@@ -175,7 +175,7 @@ show_logs_info() {
     echo "============================================================"
     log_info "日志查看命令："
     echo "============================================================"
-    echo "  查看所有日志:     docker-compose logs -f"
+    echo "  查看所有日志:     docker compose logs -f"
     echo "  查看 API 日志:    docker logs -f delivery_api"
     echo "  查看数据库日志:    docker logs -f delivery_postgres"
     echo "  查看调度器日志:    docker logs -f delivery_scheduler"
@@ -220,10 +220,10 @@ show_next_steps() {
     echo "  3. 运行爬虫测试：curl -X POST http://localhost:8000/run/crawler"
     echo ""
     echo "停止服务："
-    echo "  docker-compose down"
+    echo "  docker compose down"
     echo ""
     echo "重启服务："
-    echo "  docker-compose restart"
+    echo "  docker compose restart"
     echo ""
 }
 
@@ -232,7 +232,7 @@ clean_all() {
     log_warning "清理所有容器、镜像和数据..."
     read -p "确认删除所有数据？(y/N): " confirm
     if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
-        docker-compose down -v
+        docker compose down -v
         docker rmi dataautomaticengine-api dataautomaticengine-crawler dataautomaticengine-etl dataautomaticengine-scheduler 2>/dev/null || true
         log_success "清理完成"
     else
@@ -258,7 +258,7 @@ main() {
         wait_for_services
     elif [ "$1" = "restart" ]; then
         log_info "重启所有服务..."
-        docker-compose restart
+        docker compose restart
         wait_for_services
     else
         # 默认流程：完整构建和启动
