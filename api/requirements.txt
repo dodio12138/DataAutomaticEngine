@@ -3,3 +3,6 @@ fastapi
 uvicorn
 docker
 requests
+pycryptodome
+lark-oapi
+nest-asyncio

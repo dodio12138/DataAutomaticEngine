@@ -1,18 +1,54 @@
 """FastAPI 应用主入口"""
 from fastapi import FastAPI
 from utils import get_db_conn
-from routers import crawler, etl, reminder
+from routers import crawler, etl, reminder, feishu_bot
+from contextlib import asynccontextmanager
+import threading
+
+
+# 启动长链接服务
+def start_ws_service():
+    """在后台线程启动飞书长链接服务"""
+    import asyncio
+    import nest_asyncio
+    try:
+        from services.feishu_bot.ws_service import ws_service
+        print("🔌 启动飞书长链接服务（后台线程）...")
+        # 允许嵌套事件循环
+        nest_asyncio.apply()
+        ws_service.start()
+    except Exception as e:
+        print(f"⚠️  长链接服务启动失败: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理"""
+    # 启动时：在后台线程启动长链接服务
+    ws_thread = threading.Thread(target=start_ws_service, daemon=True)
+    ws_thread.start()
+    print("✅ 飞书长链接服务已在后台启动")
+    
+    yield
+    
+    # 关闭时：清理资源（长链接会随守护线程自动结束）
+    print("🛑 API 服务关闭")
+
 
 app = FastAPI(
     title="数据自动化引擎 API",
     description="海底捞数据爬取与 ETL 处理服务",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # 注册路由
 app.include_router(crawler.router)
 app.include_router(etl.router)
 app.include_router(reminder.router)
+app.include_router(feishu_bot.router)
 
 
 @app.get("/")
@@ -25,7 +61,8 @@ def root():
             "health": "/health",
             "crawler": "/run/crawler",
             "etl": "/run/etl",
-            "reminder": "/reminder/*"
+            "reminder": "/reminder/*",
+            "feishu_bot": "/feishu/bot/*"
         }
     }
 
