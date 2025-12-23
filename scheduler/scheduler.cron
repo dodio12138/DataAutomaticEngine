@@ -1,5 +1,5 @@
 # 每天凌晨4点执行爬虫任务（抓取所有店铺订单，随机延迟1-5分钟）
-0 4 * * * /bin/bash -c 'sleep $((60 + RANDOM % 240)) && curl -s -X POST http://api:8000/run/crawler -H "Content-Type: application/json" -d '"'"'{"store_code":"all"}'"'"''
+0 5 * * * /bin/bash -c 'sleep $((60 + RANDOM % 240)) && curl -s -X POST http://api:8000/run/crawler -H "Content-Type: application/json" -d '"'"'{"store_code":"all"}'"'"''
 
 # 每天早上9点发送昨日订单汇总（示例，可根据需要启用）
-0 5 * * * curl -s -X POST http://api:8000/reminder/daily-summary
+0 6 * * * curl -s -X POST http://api:8000/reminder/daily-summary
