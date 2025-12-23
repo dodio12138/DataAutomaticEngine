@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS raw_orders (
     store_code VARCHAR(64),
     store_name VARCHAR(128),
     order_id VARCHAR(128) NOT NULL,
+    order_date TIMESTAMP,
+    estimated_revenue NUMERIC(10,2),
+    product_amount NUMERIC(10,2),
+    discount_amount NUMERIC(10,2),
+    print_amount NUMERIC(10,2),
     payload JSONB NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );
@@ -26,3 +31,4 @@ CREATE TABLE IF NOT EXISTS raw_orders (
 -- 可按需添加索引
 CREATE INDEX IF NOT EXISTS idx_raw_orders_platform_order ON raw_orders(platform, order_id);
 CREATE INDEX IF NOT EXISTS idx_raw_orders_store_time ON raw_orders(store_code, created_at);
+CREATE INDEX IF NOT EXISTS idx_raw_orders_order_date ON raw_orders(order_date);

@@ -44,7 +44,6 @@ services:
     depends_on:
       - api
     volumes:
-      - ./scheduler/crontab:/etc/crontabs/root
       - ./api/logs:/app/logs  # 日志目录共享
     restart: unless-stopped
 volumes:

@@ -25,18 +25,32 @@ def send_daily_summary():
     示例 crontab 配置：
     0 9 * * * curl -s -X POST http://api:8000/reminder/daily-summary
     """
-    # 生成汇总报告
-    summary = report_service.generate_daily_summary_text()
+    from datetime import timedelta
     
-    # 发送到飞书
-    result = feishu_service.send_with_default_webhook(summary)
+    # 获取昨天的日期
+    date_str = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    # 查询汇总数据
+    summary_data = report_service.query_order_summary(date_str)
+    
+    if not summary_data['success']:
+        # 如果查询失败，发送文本消息
+        result = feishu_service.send_with_default_webhook(
+            f"📊 熊猫外卖 {date_str} 数据汇总\n\n{summary_data['message']}"
+        )
+    else:
+        # 发送卡片消息
+        result = feishu_service.send_daily_summary_card(summary_data)
+    
+    # 同时生成文本汇总供返回
+    summary_text = report_service.generate_daily_summary_text(date_str)
     
     if result['success']:
         return {
             'status': 'ok',
             'message': '每日汇总已发送',
             'timestamp': datetime.now().isoformat(),
-            'summary': summary
+            'summary': summary_text
         }
     else:
         raise HTTPException(

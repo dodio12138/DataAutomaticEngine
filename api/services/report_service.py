@@ -27,9 +27,11 @@ def query_order_summary(date_str: str, store_name: Optional[str] = None) -> dict
                     store_name,
                     store_code,
                     COUNT(*) as order_count,
-                    SUM(CAST(payload->>'orderPrice' AS NUMERIC)) as total_amount
+                    SUM(CAST(payload->'data'->>'fixedPrice' AS NUMERIC)) as total_amount,
+                    SUM(estimated_revenue) as total_revenue,
+                    SUM(print_amount) as total_print_amount
                 FROM raw_orders
-                WHERE DATE(created_at) = %s
+                WHERE DATE(order_date) = %s
                   AND (
                       LOWER(store_name) LIKE LOWER(%s)
                       OR LOWER(store_code) LIKE LOWER(%s)
@@ -46,9 +48,11 @@ def query_order_summary(date_str: str, store_name: Optional[str] = None) -> dict
                     store_name,
                     store_code,
                     COUNT(*) as order_count,
-                    SUM(CAST(payload->>'orderPrice' AS NUMERIC)) as total_amount
+                    SUM(CAST(payload->'data'->>'fixedPrice' AS NUMERIC)) as total_amount,
+                    SUM(estimated_revenue) as total_revenue,
+                    SUM(print_amount) as total_print_amount
                 FROM raw_orders
-                WHERE DATE(created_at) = %s
+                WHERE DATE(order_date) = %s
                 GROUP BY store_name, store_code
                 ORDER BY order_count DESC
             """
@@ -69,7 +73,9 @@ def query_order_summary(date_str: str, store_name: Optional[str] = None) -> dict
                 'store_name': row[0] or row[1],
                 'store_code': row[1],
                 'order_count': row[2],
-                'total_amount': float(row[3]) if row[3] else 0.0
+                'total_amount': float(row[3]) if row[3] else 0.0,
+                'total_revenue': float(row[4]) if row[4] else 0.0,
+                'total_print_amount': float(row[5]) if row[5] else 0.0
             })
         
         return {
@@ -104,32 +110,42 @@ def generate_daily_summary_text(date_str: Optional[str] = None) -> str:
     result = query_order_summary(date_str)
     
     if not result['success']:
-        return f"📊 {date_str} 数据汇总\n\n{result['message']}"
+        return f"📊 熊猫外卖 {date_str} 数据汇总\n\n{result['message']}"
     
     # 生成报告文本
     lines = [
-        f"📊 {date_str} 订单数据汇总",
+        f"📊 熊猫外卖 {date_str} 订单数据汇总",
         f"{'='*40}\n"
     ]
     
     total_orders = 0
     total_amount = 0.0
+    total_revenue = 0.0
+    total_print = 0.0
     
     for store in result['stores']:
         store_name = store['store_name']
         order_count = store['order_count']
         amount = store['total_amount']
+        revenue = store.get('total_revenue', 0.0)
+        print_amt = store.get('total_print_amount', 0.0)
         
         total_orders += order_count
         total_amount += amount
+        total_revenue += revenue
+        total_print += print_amt
         
         lines.append(f"🏪 {store_name}")
         lines.append(f"   📦 订单：{order_count} 单")
-        lines.append(f"   💰 金额：£{amount:.2f}\n")
+        lines.append(f"   💰 实收金额：£{amount:.2f}")
+        lines.append(f"   💵 打印单金额：£{print_amt:.2f}")
+        lines.append(f"   💸 预计收入：£{revenue:.2f}\n")
     
     lines.append(f"{'='*40}")
     lines.append(f"📈 总计：{total_orders} 单")
-    lines.append(f"💷 总额：£{total_amount:.2f}")
+    lines.append(f"💷 实收总额：£{total_amount:.2f}")
+    lines.append(f"📤 打印单总额：£{total_print:.2f}")
+    lines.append(f"💹 预计总收入：£{total_revenue:.2f}")
     
     return "\n".join(lines)
 
@@ -159,12 +175,16 @@ def generate_store_summary_text(store_name: str, date_str: str) -> str:
 🏪 店铺：{store['store_name']}
 📅 日期：{date_str}
 📦 订单数量：{store['order_count']} 单
-💰 总金额：£{store['total_amount']:.2f}"""
+💰 实收金额：£{store['total_amount']:.2f}
+📤 打印单金额：£{store.get('total_print_amount', 0.0):.2f}
+💵 预计收入：£{store.get('total_revenue', 0.0):.2f}"""
     else:
         # 多个店铺匹配
         lines = [f"📊 找到 {len(stores)} 个匹配的店铺\n📅 日期：{date_str}\n"]
         for store in stores:
             lines.append(f"\n🏪 {store['store_name']}")
             lines.append(f"   📦 订单：{store['order_count']} 单")
-            lines.append(f"   💰 金额：£{store['total_amount']:.2f}")
+            lines.append(f"   💰 实收金额：£{store['total_amount']:.2f}")
+            lines.append(f"   📤 打印单金额：£{store.get('total_print_amount', 0.0):.2f}")
+            lines.append(f"   💵 预计收入：£{store.get('total_revenue', 0.0):.2f}")
         return "\n".join(lines)

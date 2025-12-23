@@ -7,7 +7,7 @@ RUN apk add --no-cache \
     tzdata
 
 # 拷贝 crontab
-COPY crontab /etc/crontabs/root
+COPY scheduler.cron /etc/crontabs/root
 
 # 权限必须对
 RUN chmod 0644 /etc/crontabs/root

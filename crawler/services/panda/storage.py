@@ -73,6 +73,11 @@ def save_orders_to_db(raw_list: List[Dict[str, Any]], platform: str = 'panda', s
                 store_code TEXT,
                 store_name TEXT,
                 order_id TEXT NOT NULL,
+                order_date TIMESTAMP,
+                estimated_revenue NUMERIC(10,2),
+                product_amount NUMERIC(10,2),
+                discount_amount NUMERIC(10,2),
+                print_amount NUMERIC(10,2),
                 payload JSONB NOT NULL,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
             );
@@ -95,8 +100,46 @@ def save_orders_to_db(raw_list: List[Dict[str, Any]], platform: str = 'panda', s
                 obj = item['data']
 
             # 解析订单 id 和时间字段（兼容多种字段名）
+            # 优先从data对象中获取
             order_id = obj.get('orderSn') or obj.get('order_id') or obj.get('orderId')
             time_str = obj.get('createTimeStr') or obj.get('createTime')
+            
+            # 如果obj是data，尝试从原item的data路径获取
+            if not time_str and isinstance(item, dict) and 'data' in item:
+                time_str = item['data'].get('createTimeStr') or item['data'].get('createTime')
+            
+            # 解析 feeInfoResqDTOList 中的各项费用
+            estimated_revenue = None
+            product_amount = None
+            discount_amount = None
+            
+            if isinstance(obj, dict) and 'feeInfoResqDTOList' in obj:
+                fee_list = obj.get('feeInfoResqDTOList', [])
+                if isinstance(fee_list, list):
+                    for fee_item in fee_list:
+                        if not isinstance(fee_item, dict):
+                            continue
+                        
+                        fee_name = fee_item.get('feeName', '')
+                        fee_price = fee_item.get('feePrice', '0')
+                        
+                        try:
+                            if fee_name == 'Estimated revenue':
+                                estimated_revenue = float(fee_price)
+                            elif fee_name == 'Product breakdown analysis(+)':
+                                product_amount = float(fee_price)
+                            elif fee_name == 'Discounted value by merchant(-)':
+                                discount_amount = float(fee_price)
+                        except (ValueError, TypeError):
+                            pass
+            
+            # 计算打印单金额 = 产品金额 - 折扣金额
+            print_amount = None
+            if product_amount is not None and discount_amount is not None:
+                print_amount = product_amount - discount_amount
+            elif product_amount is not None:
+                print_amount = product_amount
+            
             order_dt = None
             if time_str:
                 try:
@@ -135,13 +178,13 @@ def save_orders_to_db(raw_list: List[Dict[str, Any]], platform: str = 'panda', s
                 # payload 使用原始 item（保持 data 包装结构），以便后续调试与解析
                 if store_code or store_name:
                     cur.execute(
-                        "INSERT INTO raw_orders (platform, store_code, store_name, order_id, payload) VALUES (%s, %s, %s, %s, %s)",
-                        (platform, store_code, store_name, order_id, json.dumps(item))
+                        "INSERT INTO raw_orders (platform, store_code, store_name, order_id, order_date, estimated_revenue, product_amount, discount_amount, print_amount, payload) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        (platform, store_code, store_name, order_id, order_dt, estimated_revenue, product_amount, discount_amount, print_amount, json.dumps(item))
                     )
                 else:
                     cur.execute(
-                        "INSERT INTO raw_orders (platform, order_id, payload) VALUES (%s, %s, %s)",
-                        (platform, order_id, json.dumps(item))
+                        "INSERT INTO raw_orders (platform, order_id, order_date, estimated_revenue, product_amount, discount_amount, print_amount, payload) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                        (platform, order_id, order_dt, estimated_revenue, product_amount, discount_amount, print_amount, json.dumps(item))
                     )
                 if cur.rowcount > 0:
                     inserted += cur.rowcount
