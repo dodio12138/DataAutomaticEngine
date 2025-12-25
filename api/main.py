@@ -4,18 +4,20 @@ from utils import get_db_conn
 from routers import crawler, etl, reminder, feishu_bot
 from contextlib import asynccontextmanager
 import threading
+import nest_asyncio
+
+# 全局应用 nest-asyncio 以解决事件循环嵌套问题
+nest_asyncio.apply()
+print("✅ nest_asyncio 已全局应用")
 
 
 # 启动长链接服务
 def start_ws_service():
-    """在后台线程启动飞书长链接服务"""
-    import asyncio
-    import nest_asyncio
+    """在后台线程启动飞书长链接服务（独立事件循环）"""
     try:
         from services.feishu_bot.ws_service import ws_service
         print("🔌 启动飞书长链接服务（后台线程）...")
-        # 允许嵌套事件循环
-        nest_asyncio.apply()
+        # ws_service.start() 会在当前线程创建新的事件循环
         ws_service.start()
     except Exception as e:
         print(f"⚠️  长链接服务启动失败: {e}")

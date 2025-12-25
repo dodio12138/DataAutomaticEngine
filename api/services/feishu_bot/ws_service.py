@@ -195,6 +195,7 @@ class FeishuWebSocketService:
         print(f"{'='*60}\n")
         
         try:
+            # nest-asyncio 已在 main.py 全局应用，无需重复
             # 启动长链接（阻塞调用）
             self.ws_client.start()
             
