@@ -73,6 +73,7 @@ def run_crawler(req: CrawlerRequest):
             network="dataautomaticengine_default",  # 连接到 docker compose 网络
             volumes={"/var/lib/postgresql": {"bind": "/var/lib/postgresql", "mode": "ro"}},
             working_dir="/app",
+            shm_size="1g",  # 设置共享内存大小为 2GB，确保 Chrome/Selenium 有足够内存
             labels={
                 "com.docker.compose.project": "dataautomaticengine",
                 "com.docker.compose.service": "crawler-temp"
