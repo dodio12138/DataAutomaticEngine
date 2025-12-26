@@ -68,15 +68,17 @@ class Responder:
         创建每日汇总响应
         
         参数：
-        - params: 参数（包含date等）
+        - params: 参数（包含 start_date, end_date 或 date）
         
         返回：
         - Dict: 飞书消息响应
         """
-        date = params.get('date')
+        # 支持新的 start_date/end_date 和旧的 date 参数
+        start_date = params.get('start_date') or params.get('date')
+        end_date = params.get('end_date')
         
         # 生成汇总报告
-        summary_text = report_service.generate_daily_summary_text(date)
+        summary_text = report_service.generate_daily_summary_text(start_date, end_date)
         
         return self._create_text_response(summary_text)
     
@@ -85,22 +87,23 @@ class Responder:
         创建店铺汇总响应
         
         参数：
-        - params: 参数（包含store_name和date）
+        - params: 参数（包含 store_name, start_date, end_date 或 date）
         
         返回：
         - Dict: 飞书消息响应
         """
-        store_name = params.get('store_name')
-        date = params.get('date')
+        store_name = params.get('store_name', '').strip()
+        start_date = params.get('start_date') or params.get('date')
+        end_date = params.get('end_date')
         
-        if not store_name:
+        if not store_name or store_name == '':
             return self._create_text_response("❌ 请指定店铺名称")
         
-        if not date:
+        if not start_date:
             return self._create_text_response("❌ 请指定查询日期")
         
         # 生成店铺汇总
-        summary_text = report_service.generate_store_summary_text(store_name, date)
+        summary_text = report_service.generate_store_summary_text(store_name, start_date, end_date)
         
         return self._create_text_response(summary_text)
     
@@ -115,25 +118,37 @@ class Responder:
 
 📌 支持的命令：
 
-1️⃣ **查询订单数据**
-   • 查询2025-12-22
+1️⃣ **每日汇总（支持日期范围）**
+   • 昨天汇总 / 今天数据
+   • 2025-12-24 （单日汇总）
+   • 2025-12-20至2025-12-24 （多日汇总）
+   • 2025-12-20-2025-12-24
+   • 2025-12-20到2025-12-24
+
+2️⃣ **店铺查询（支持日期范围）**
+   单日查询：
+   • Piccadilly店 2025-12-22
+   • battersea 2025-12-22
+   • 查询 Piccadilly 2025-12-22
+   
+   多日查询：
+   • Battersea店 2025-12-20至2025-12-24
+   • battersea 2025-12-20-2025-12-24
+   • 查询 巴特西 2025-12-20到2025-12-24
+   • 2025-12-20至2025-12-24 Battersea店
+
+3️⃣ **查询订单数据**
    • 2025-12-22订单
 
-2️⃣ **每日汇总**
-   • 昨天汇总
-   • 今天数据
-   • 每日汇总
-
-3️⃣ **店铺查询**
-   • Piccadilly店2025-12-22
-   • 2025-12-22 Battersea店
-
 4️⃣ **帮助信息**
-   • 帮助
-   • help
+   • 帮助 / help
 
-💡 提示：日期格式为 YYYY-MM-DD
-🐼 数据来源：熊猫外卖"""
+💡 提示：
+   • 日期格式：YYYY-MM-DD
+   • 多日查询会显示数据汇总
+   • 支持中文/英文店铺名模糊匹配
+   • 日期分隔符：至、-、到
+🐼 数据来源：HungryPanda / Deliveroo"""
         
         return self._create_text_response(help_text)
     

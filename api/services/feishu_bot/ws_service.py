@@ -181,8 +181,8 @@ class FeishuWebSocketService:
     
     def start(self):
         """
-        启动长链接服务（阻塞式）
-        在独立进程中运行，拥有独立的事件循环，无冲突
+        启动长链接服务
+        阻塞式运行，保持 WebSocket 连接
         """
         if not self.ws_client:
             print(f"❌ 无法启动长链接服务：客户端未初始化")
@@ -195,7 +195,8 @@ class FeishuWebSocketService:
         print(f"{'='*60}\n")
         
         try:
-            # 独立进程模式，直接启动（无需 nest-asyncio）
+            # nest-asyncio 已在 main.py 全局应用，无需重复
+            # 启动长链接（阻塞调用）
             self.ws_client.start()
             
         except Exception as e:

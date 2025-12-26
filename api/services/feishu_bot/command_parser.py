@@ -12,20 +12,48 @@ class CommandParser:
     
     def __init__(self):
         # 定义命令模式（可扩展）
+        # 注意：匹配顺序很重要！具体的模式要放在通用模式之前
         self.patterns = {
+            'store_summary': [
+                # 店铺查询必须放在最前面，避免被其他模式误匹配
+                # 支持"查询 店铺名 日期"格式（日期范围）
+                r'查询\s*(.+?)\s*(\d{4}-\d{2}-\d{2})\s*至\s*(\d{4}-\d{2}-\d{2})',
+                r'查询\s*(.+?)\s*(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})',
+                r'查询\s*(.+?)\s*(\d{4}-\d{2}-\d{2})\s*到\s*(\d{4}-\d{2}-\d{2})',
+                # 支持"查询 店铺名 日期"格式（单日期）
+                r'查询\s*(.+?)\s*(\d{4}-\d{2}-\d{2})',
+                # 支持"英文店铺名 日期"格式（不带"店"字）- 日期范围
+                r'([a-zA-Z]\w+)\s+(\d{4}-\d{2}-\d{2})\s*至\s*(\d{4}-\d{2}-\d{2})',
+                r'([a-zA-Z]\w+)\s+(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})',
+                r'([a-zA-Z]\w+)\s+(\d{4}-\d{2}-\d{2})\s*到\s*(\d{4}-\d{2}-\d{2})',
+                # 支持"英文店铺名 日期"格式（不带"店"字）- 单日期
+                r'([a-zA-Z]\w+)\s+(\d{4}-\d{2}-\d{2})',
+                # 支持日期范围：某店铺 2025-12-20至2025-12-24
+                r'(.+店|.+店铺).*?(\d{4}-\d{2}-\d{2})\s*至\s*(\d{4}-\d{2}-\d{2})',
+                r'(.+店|.+店铺).*?(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})',
+                r'(.+店|.+店铺).*?(\d{4}-\d{2}-\d{2})\s*到\s*(\d{4}-\d{2}-\d{2})',
+                r'(\d{4}-\d{2}-\d{2})\s*至\s*(\d{4}-\d{2}-\d{2}).*?(.+店|.+店铺)',
+                r'(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2}).*?(.+店|.+店铺)',
+                r'(\d{4}-\d{2}-\d{2})\s*到\s*(\d{4}-\d{2}-\d{2}).*?(.+店|.+店铺)',
+                # 单个日期：某店铺2025-12-22
+                r'(.+店|.+店铺).*?(\d{4}-\d{2}-\d{2})',
+                r'(\d{4}-\d{2}-\d{2}).*?(.+店|.+店铺)',
+            ],
             'query_orders': [
-                r'查询.*?(\d{4}-\d{2}-\d{2})',  # 查询2025-12-22
                 r'(\d{4}-\d{2}-\d{2}).*?订单',  # 2025-12-22订单
             ],
             'daily_summary': [
+                # 支持日期范围：2025-12-20至2025-12-24
+                r'(\d{4}-\d{2}-\d{2})\s*至\s*(\d{4}-\d{2}-\d{2})',
+                r'(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})',
+                r'(\d{4}-\d{2}-\d{2})\s+到\s+(\d{4}-\d{2}-\d{2})',
+                # 单个日期：2025-12-24
+                r'(\d{4}-\d{2}-\d{2})',
+                # 时间关键词
                 r'(昨[天日]|今[天日]|前[天日]).*?(汇总|报告|数据|订单)',
                 r'汇总.*?(昨[天日]|今[天日]|前[天日])',
                 r'每日汇总',
                 r'(昨[天日]|今[天日]|前[天日])',  # 支持单独的时间词
-            ],
-            'store_summary': [
-                r'(.+店|.+店铺).*?(\d{4}-\d{2}-\d{2})',  # 某店铺2025-12-22
-                r'(\d{4}-\d{2}-\d{2}).*?(.+店|.+店铺)',  # 2025-12-22某店铺
             ],
             'help': [
                 r'(帮助|help|\?|？)',  # 移除^$，允许部分匹配
@@ -89,18 +117,46 @@ class CommandParser:
                 params['date'] = match.group(1)
         
         elif command_type == 'daily_summary':
-            # 解析时间关键词
-            time_word = match.group(1) if match.groups() else None
-            params['date'] = self._parse_time_word(time_word)
+            groups = match.groups()
+            # 检查是否有日期范围（两个日期）
+            dates = [g for g in groups if g and re.match(r'\d{4}-\d{2}-\d{2}', g)]
+            if len(dates) >= 2:
+                params['start_date'] = dates[0]
+                params['end_date'] = dates[1]
+            elif len(dates) == 1:
+                params['start_date'] = dates[0]
+                params['end_date'] = dates[0]
+            else:
+                # 解析时间关键词
+                time_word = groups[0] if groups and groups[0] else None
+                parsed_date = self._parse_time_word(time_word)
+                params['start_date'] = parsed_date
+                params['end_date'] = parsed_date
         
         elif command_type == 'store_summary':
-            # 提取店铺名和日期
+            # 提取店铺名和日期（支持日期范围）
             groups = match.groups()
+            dates = []
+            store_name = None
+            
             for group in groups:
-                if re.match(r'\d{4}-\d{2}-\d{2}', group):
-                    params['date'] = group
-                elif '店' in group:
-                    params['store_name'] = group.replace('店铺', '').replace('店', '')
+                if group and re.match(r'\d{4}-\d{2}-\d{2}', group):
+                    dates.append(group)
+                elif group and '店' in group:
+                    store_name = group.replace('店铺', '').replace('店', '').strip()
+                elif group and group.strip() and not re.match(r'\d{4}-\d{2}-\d{2}', group):
+                    # 非日期的文本视为店铺名（如英文店铺名或中文店铺名）
+                    store_name = group.strip()
+            
+            if store_name and store_name != '':
+                params['store_name'] = store_name
+            
+            if len(dates) >= 2:
+                params['start_date'] = dates[0]
+                params['end_date'] = dates[1]
+            elif len(dates) == 1:
+                params['start_date'] = dates[0]
+                params['end_date'] = dates[0]
         
         return params
     

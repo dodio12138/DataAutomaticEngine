@@ -2,9 +2,74 @@
 
 # 查看订单数据脚本
 # 用法: ./db_view_orders.sh [日期] [店铺代码] [限制条数]
-# 示例: ./db_view_orders.sh 2025-12-24 battersea_maocai 10
-#      ./db_view_orders.sh 2025-12-24  # 查看某天所有店铺
-#      ./db_view_orders.sh  # 查看最近10条
+
+show_help() {
+    cat << 'EOF'
+订单数据查询工具 (db_view_orders.sh)
+
+功能说明：
+  查询并显示 raw_orders 表中的订单数据，支持按日期、店铺过滤，
+  并可限制返回条数。
+
+用法：
+  ./db_view_orders.sh [选项] [日期] [店铺代码] [限制条数]
+
+选项：
+  --help, -h    显示此帮助信息
+
+参数：
+  日期          订单日期，格式 YYYY-MM-DD（可选）
+  店铺代码      店铺英文代码，如 battersea_maocai（可选）
+  限制条数      返回的最大记录数，默认 10
+
+参数组合逻辑：
+  - 无参数：返回最近 10 条订单
+  - 仅日期：返回该日期所有店铺的订单（最多 10 条）
+  - 日期+店铺：返回该日期该店铺的订单（最多 10 条）
+  - 日期+店铺+限制：返回指定条数的订单
+
+示例：
+  ./db_view_orders.sh                           # 查看最近 10 条订单
+  ./db_view_orders.sh 2025-12-24                # 查看 12-24 日所有店铺订单
+  ./db_view_orders.sh 2025-12-24 battersea_maocai # 查看特定店铺订单
+  ./db_view_orders.sh 2025-12-24 battersea_maocai 20 # 返回 20 条订单
+
+输出内容：
+  - 订单 ID
+  - 平台（HungryPanda / Deliveroo）
+  - 店铺代码
+  - 抓取时间
+  - 原始 JSON 数据（payload 字段）
+
+注意事项：
+  - 日期基于 payload JSON 中的订单日期，不是抓取时间
+  - 店铺代码需与数据库中的 store_code 字段完全匹配
+  - 输出包含完整 JSON 数据，可能较长
+
+依赖：
+  - Docker
+  - delivery_postgres 容器运行中
+  - raw_orders 表存在
+
+相关工具：
+  - db_view_raw.sh - 仅查看原始 JSON（更简洁）
+  - db_daily_summary.sh - 查看日期汇总（无详细数据）
+  - db_stats.sh - 查看全局统计信息
+  - manual_crawl.sh - 触发新的数据抓取
+
+可用店铺代码：
+  battersea_maocai, battersea_restaurant, camden_maocai,
+  dublin_maocai, dublin_restaurant, nottingham_restaurant,
+  glasgow_restaurant
+
+EOF
+    exit 0
+}
+
+# 检查帮助选项
+if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+    show_help
+fi
 
 # 颜色定义
 GREEN='\033[0;32m'
