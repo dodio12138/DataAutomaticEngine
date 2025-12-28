@@ -163,9 +163,22 @@ if [ "$CLEAN_IMAGES" = true ]; then
     echo -e "${CYAN}步骤 3/5: 删除旧镜像${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
+    # 始终清理 crawler 镜像
+    echo -e "${YELLOW}🗑️  删除镜像: dataautomaticengine-crawler${NC}"
+    if docker images -q "dataautomaticengine-crawler" 2>/dev/null | grep -q .; then
+        docker rmi -f "dataautomaticengine-crawler" 2>/dev/null || echo -e "${YELLOW}⚠️  镜像 dataautomaticengine-crawler 可能正在被使用，跳过删除${NC}"
+    else
+        echo -e "${CYAN}ℹ️  镜像 dataautomaticengine-crawler 不存在，无需删除${NC}"
+    fi
+    
     for service in "${SERVICES_TO_REBUILD[@]}"; do
         if [ "$service" = "db" ]; then
             echo -e "${YELLOW}⏭️  跳过 db 镜像（使用官方镜像）${NC}"
+            continue
+        fi
+        
+        # 跳过 crawler，已经处理过了
+        if [ "$service" = "crawler" ]; then
             continue
         fi
         
@@ -200,17 +213,27 @@ for service in "${SERVICES_TO_REBUILD[@]}"; do
     fi
 done
 
+# 始终构建 crawler 镜像（即使不在服务列表中）
+echo -e "${YELLOW}🔨 构建 crawler 镜像（独立镜像）${NC}"
+docker build --no-cache -t dataautomaticengine-crawler ./crawler
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}❌ crawler 镜像构建失败${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ crawler 镜像构建完成${NC}"
+
 if [ ${#BUILD_SERVICES[@]} -gt 0 ]; then
-    echo -e "${YELLOW}🔨 构建镜像: ${BUILD_SERVICES[*]}${NC}"
+    echo -e "${YELLOW}🔨 构建服务镜像: ${BUILD_SERVICES[*]}${NC}"
     docker compose build --no-cache "${BUILD_SERVICES[@]}"
     
     if [ $? -ne 0 ]; then
         echo -e "${RED}❌ 镜像构建失败${NC}"
         exit 1
     fi
-    echo -e "${GREEN}✅ 镜像构建完成${NC}"
+    echo -e "${GREEN}✅ 服务镜像构建完成${NC}"
 else
-    echo -e "${YELLOW}ℹ️  无需构建镜像（仅重启 db 服务）${NC}"
+    echo -e "${YELLOW}ℹ️  无需构建服务镜像（仅重启 db 服务）${NC}"
 fi
 
 echo ""
