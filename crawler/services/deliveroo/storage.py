@@ -243,34 +243,22 @@ def save_orders_to_db(raw_list: List[Dict[str, Any]], platform: str = 'deliveroo
             if not order_id:
                 continue
 
-            # 使用 ON CONFLICT 实现去重和更新逻辑
-            # 当 (platform, order_id) 相同但其他字段不同时，更新为新数据
+            # 检查是否已存在
             try:
-                # 插入数据，冲突时更新
+                cur.execute(
+                    "SELECT 1 FROM raw_orders WHERE platform = %s AND order_id = %s LIMIT 1",
+                    (platform, order_id)
+                )
+                if cur.fetchone():
+                    continue
+
+                # 插入数据
                 if store_code or store_name:
                     cur.execute(
                         """INSERT INTO raw_orders 
                            (platform, store_code, store_name, order_id, order_date, 
                             estimated_revenue, product_amount, discount_amount, print_amount, payload) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                           ON CONFLICT (platform, order_id) 
-                           DO UPDATE SET
-                               store_code = EXCLUDED.store_code,
-                               store_name = EXCLUDED.store_name,
-                               order_date = EXCLUDED.order_date,
-                               estimated_revenue = EXCLUDED.estimated_revenue,
-                               product_amount = EXCLUDED.product_amount,
-                               discount_amount = EXCLUDED.discount_amount,
-                               print_amount = EXCLUDED.print_amount,
-                               payload = EXCLUDED.payload
-                           WHERE raw_orders.store_code IS DISTINCT FROM EXCLUDED.store_code
-                              OR raw_orders.store_name IS DISTINCT FROM EXCLUDED.store_name
-                              OR raw_orders.order_date IS DISTINCT FROM EXCLUDED.order_date
-                              OR raw_orders.estimated_revenue IS DISTINCT FROM EXCLUDED.estimated_revenue
-                              OR raw_orders.product_amount IS DISTINCT FROM EXCLUDED.product_amount
-                              OR raw_orders.discount_amount IS DISTINCT FROM EXCLUDED.discount_amount
-                              OR raw_orders.print_amount IS DISTINCT FROM EXCLUDED.print_amount
-                              OR raw_orders.payload IS DISTINCT FROM EXCLUDED.payload""",
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                         (platform, store_code, store_name, order_id, order_dt, 
                          estimated_revenue, product_amount, discount_amount, print_amount, 
                          json.dumps(item))
@@ -280,21 +268,7 @@ def save_orders_to_db(raw_list: List[Dict[str, Any]], platform: str = 'deliveroo
                         """INSERT INTO raw_orders 
                            (platform, order_id, order_date, estimated_revenue, 
                             product_amount, discount_amount, print_amount, payload) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                           ON CONFLICT (platform, order_id) 
-                           DO UPDATE SET
-                               order_date = EXCLUDED.order_date,
-                               estimated_revenue = EXCLUDED.estimated_revenue,
-                               product_amount = EXCLUDED.product_amount,
-                               discount_amount = EXCLUDED.discount_amount,
-                               print_amount = EXCLUDED.print_amount,
-                               payload = EXCLUDED.payload
-                           WHERE raw_orders.order_date IS DISTINCT FROM EXCLUDED.order_date
-                              OR raw_orders.estimated_revenue IS DISTINCT FROM EXCLUDED.estimated_revenue
-                              OR raw_orders.product_amount IS DISTINCT FROM EXCLUDED.product_amount
-                              OR raw_orders.discount_amount IS DISTINCT FROM EXCLUDED.discount_amount
-                              OR raw_orders.print_amount IS DISTINCT FROM EXCLUDED.print_amount
-                              OR raw_orders.payload IS DISTINCT FROM EXCLUDED.payload""",
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                         (platform, order_id, order_dt, estimated_revenue, 
                          product_amount, discount_amount, print_amount, json.dumps(item))
                     )

@@ -17,16 +17,23 @@ show_help() {
 选项：
   --help, -h         显示此帮助信息
   --clean-images     删除旧镜像（释放磁盘空间）
+  --clear-cache      清除 Docker 构建缓存（prune build cache）
 
 参数：
   服务名             要重构的服务名称（多个用空格分隔）
                      可用服务：api, crawler, etl, scheduler, db
                      省略则重构所有主要服务（db, api, scheduler）
 
+注意：
+  - crawler 镜像会自动重构（无论是否指定）
+  - 默认使用 --no-cache 确保完全重新构建
+
 示例：
   ./rebuild.sh                      # 重构所有主要服务（保留数据库数据）
-  ./rebuild.sh api                  # 仅重构 api 服务
+  ./rebuild.sh api                  # 仅重构 api 服务（crawler 也会重构）
   ./rebuild.sh --clean-images       # 重构所有服务并删除旧镜像
+  ./rebuild.sh --clear-cache        # 重构并清除 Docker 构建缓存
+  ./rebuild.sh --clean-images --clear-cache  # 清理镜像和缓存
   ./rebuild.sh --clean-images api   # 重构 api 并删除旧镜像
   ./rebuild.sh api scheduler        # 重构 api 和 scheduler 服务
 
@@ -75,11 +82,14 @@ ALL_SERVICES=("db" "api" "scheduler")  # 默认重构的服务（需构建的）
 
 # 解析参数
 CLEAN_IMAGES=false
+CLEAR_CACHE=false
 SERVICES_TO_REBUILD=()
 
 for arg in "$@"; do
     if [ "$arg" = "--clean-images" ]; then
         CLEAN_IMAGES=true
+    elif [ "$arg" = "--clear-cache" ]; then
+        CLEAR_CACHE=true
     else
         SERVICES_TO_REBUILD+=("$arg")
     fi
@@ -98,6 +108,14 @@ if [ "$CLEAN_IMAGES" = true ]; then
 else
     echo -e "${CYAN}💾 镜像清理: 禁用（保留旧镜像）${NC}"
 fi
+
+if [ "$CLEAR_CACHE" = true ]; then
+    echo -e "${YELLOW}🧹 构建缓存: 清除（prune build cache）${NC}"
+else
+    echo -e "${CYAN}📦 构建缓存: 保留${NC}"
+fi
+
+echo -e "${GREEN}🔄 Crawler 镜像: 总是重构${NC}"
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  容器重构脚本${NC}"
@@ -198,6 +216,23 @@ if [ "$CLEAN_IMAGES" = true ]; then
 else
     STEP_BUILD="3/4"
     STEP_START="4/4"
+fi
+
+# 如果启用了缓存清除
+if [ "$CLEAR_CACHE" = true ]; then
+    echo ""
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${CYAN}步骤额外: 清除 Docker 构建缓存${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    
+    echo -e "${YELLOW}🧹 清除构建缓存...${NC}"
+    docker builder prune -af
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 构建缓存已清除${NC}"
+    else
+        echo -e "${YELLOW}⚠️  清除构建缓存失败，继续执行${NC}"
+    fi
 fi
 
 echo ""
