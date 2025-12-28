@@ -11,6 +11,7 @@ router = APIRouter(prefix="/run", tags=["crawler"])
 
 
 class CrawlerRequest(BaseModel):
+    platform: str = Field("panda", description="平台名称：'panda' 或 'deliveroo'")
     store_code: str = Field(None, description="英文店铺代码，如 towerbridge_maocai，或 'all'")
     store_codes: list[str] | None = Field(None, description="多个英文店铺代码数组，或包含 'all'")
     store_name: str = Field(None, description="中文店铺名，可选（单个）")
@@ -24,11 +25,17 @@ def run_crawler(req: CrawlerRequest):
     创建临时容器执行爬虫任务，并保存日志。
 
     逻辑：
+    - 支持多平台：panda（默认）或 deliveroo
     - 检查镜像是否存在，不存在则自动构建
-    - 构建环境变量（包括 DB 连接信息）
+    - 构建环境变量（包括 DB 连接信息和平台参数）
     - 创建临时容器执行爬虫（连接到 docker compose 网络）
     - 保存日志到 /app/logs
     """
+    # 验证平台参数
+    platform = (req.platform or "panda").lower()
+    if platform not in ['panda', 'deliveroo']:
+        raise HTTPException(status_code=400, detail=f"不支持的平台：{platform}，支持的平台：panda, deliveroo")
+    
     # 确保镜像存在
     ensure_image_exists("dataautomaticengine-crawler", "../crawler")
     
@@ -39,6 +46,9 @@ def run_crawler(req: CrawlerRequest):
 
     # 构建环境变量（包含 DB 环境变量）
     env_dict = get_db_env_dict()
+    
+    # 添加平台参数
+    env_dict["PLATFORM"] = platform
     
     # 添加爬虫参数
     if req.store_codes:
@@ -61,8 +71,8 @@ def run_crawler(req: CrawlerRequest):
 
     # 生成时间戳用于日志文件名和容器名
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    log_file = os.path.join(LOG_DIR, f"crawler_{timestamp}.log")
-    container_name = f"crawler_{timestamp}"  # 固定命名格式
+    log_file = os.path.join(LOG_DIR, f"crawler_{platform}_{timestamp}.log")
+    container_name = f"crawler_{platform}_{timestamp}"  # 包含平台标识
 
     try:
         # 创建临时容器（连接到 docker compose 网络）
@@ -106,6 +116,7 @@ def run_crawler(req: CrawlerRequest):
         
         return {
             "status": "crawler executed",
+            "platform": platform,
             "container_id": container.id[:12],
             "container_name": container_name,
             "exit_code": exit_code,

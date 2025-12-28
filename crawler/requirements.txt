@@ -3,3 +3,4 @@ selenium==4.24.0
 selenium_wire==5.1.0
 blinker==1.6.2
 psycopg2-binary
+requests==2.31.0

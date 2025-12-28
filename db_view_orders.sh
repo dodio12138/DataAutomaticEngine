@@ -12,13 +12,14 @@ show_help() {
   并可限制返回条数。
 
 用法：
-  ./db_view_orders.sh [选项] [日期] [店铺代码] [限制条数]
+  ./db_view_orders.sh [选项] [日期] [平台] [店铺代码] [限制条数]
 
 选项：
   --help, -h    显示此帮助信息
 
 参数：
   日期          订单日期，格式 YYYY-MM-DD（可选）
+  平台          平台名称，hungrypanda 或 deliveroo（可选）
   店铺代码      店铺英文代码，如 battersea_maocai（可选）
   限制条数      返回的最大记录数，默认 10
 
@@ -29,10 +30,11 @@ show_help() {
   - 日期+店铺+限制：返回指定条数的订单
 
 示例：
-  ./db_view_orders.sh                           # 查看最近 10 条订单
-  ./db_view_orders.sh 2025-12-24                # 查看 12-24 日所有店铺订单
-  ./db_view_orders.sh 2025-12-24 battersea_maocai # 查看特定店铺订单
-  ./db_view_orders.sh 2025-12-24 battersea_maocai 20 # 返回 20 条订单
+  ./db_view_orders.sh                                    # 查看最近 10 条订单
+  ./db_view_orders.sh 2025-12-24                         # 查看 12-24 日所有店铺订单
+  ./db_view_orders.sh 2025-12-24 hungrypanda             # 查看特定平台订单
+  ./db_view_orders.sh 2025-12-24 deliveroo battersea_maocai # 查看特定平台和店铺订单
+  ./db_view_orders.sh 2025-12-24 hungrypanda battersea_maocai 20 # 返回 20 条订单
 
 输出内容：
   - 订单 ID
@@ -78,8 +80,16 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 DATE="${1}"
-STORE="${2}"
-LIMIT="${3:-10}"
+PLATFORM="${2}"
+STORE="${3}"
+LIMIT="${4:-10}"
+
+# 如果第二个参数不是有效平台，重新调整参数
+if [ -n "$PLATFORM" ] && [ "$PLATFORM" != "hungrypanda" ] && [ "$PLATFORM" != "deliveroo" ]; then
+    LIMIT="${3:-10}"
+    STORE="$PLATFORM"
+    PLATFORM=""
+fi
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  📊 订单数据查询${NC}"
@@ -92,58 +102,34 @@ if ! docker ps | grep -q delivery_postgres; then
 fi
 
 # 构建SQL查询
-if [ -n "$DATE" ] && [ -n "$STORE" ]; then
-    # 指定日期和店铺
-    SQL="SELECT 
-        r.order_id,
-        COALESCE(s.name_cn, r.store_name) as store_name,
-        TO_CHAR(r.order_date, 'YYYY-MM-DD HH24:MI') as order_time,
-        r.platform,
-        r.estimated_revenue as revenue,
-        r.product_amount,
-        r.discount_amount
-    FROM raw_orders r
-    LEFT JOIN stores s ON r.store_code = s.code
-    WHERE DATE(r.order_date) = '$DATE' AND r.store_code = '$STORE'
-    ORDER BY r.order_date DESC
-    LIMIT $LIMIT;"
-    
-    echo -e "${YELLOW}📅 日期: $DATE${NC}"
-    echo -e "${YELLOW}🏪 店铺: $STORE${NC}"
-    
-elif [ -n "$DATE" ]; then
-    # 只指定日期
-    SQL="SELECT 
-        r.order_id,
-        COALESCE(s.name_cn, r.store_name) as store_name,
-        TO_CHAR(r.order_date, 'YYYY-MM-DD HH24:MI') as order_time,
-        r.platform,
-        r.estimated_revenue as revenue,
-        r.product_amount
-    FROM raw_orders r
-    LEFT JOIN stores s ON r.store_code = s.code
-    WHERE DATE(r.order_date) = '$DATE'
-    ORDER BY r.order_date DESC
-    LIMIT $LIMIT;"
-    
-    echo -e "${YELLOW}📅 日期: $DATE${NC}"
-    
-else
-    # 最近的订单
-    SQL="SELECT 
-        r.order_id,
-        COALESCE(s.name_cn, r.store_name) as store_name,
-        TO_CHAR(r.order_date, 'YYYY-MM-DD HH24:MI') as order_time,
-        r.platform,
-        r.estimated_revenue as revenue,
-        r.product_amount
-    FROM raw_orders r
-    LEFT JOIN stores s ON r.store_code = s.code
-    ORDER BY r.order_date DESC
-    LIMIT $LIMIT;"
-    
-    echo -e "${YELLOW}📊 最近 $LIMIT 条订单${NC}"
-fi
+WHERE_CLAUSE=""
+[ -n "$DATE" ] && WHERE_CLAUSE="$WHERE_CLAUSE AND DATE(r.order_date) = '$DATE'"
+[ -n "$PLATFORM" ] && WHERE_CLAUSE="$WHERE_CLAUSE AND r.platform = '$PLATFORM'"
+[ -n "$STORE" ] && WHERE_CLAUSE="$WHERE_CLAUSE AND r.store_code = '$STORE'"
+
+# 去除开头的 AND
+WHERE_CLAUSE="${WHERE_CLAUSE# AND}"
+[ -n "$WHERE_CLAUSE" ] && WHERE_CLAUSE="WHERE $WHERE_CLAUSE"
+
+SQL="SELECT 
+    r.order_id,
+    COALESCE(s.name_cn, r.store_name) as store_name,
+    TO_CHAR(r.order_date, 'YYYY-MM-DD HH24:MI') as order_time,
+    r.platform,
+    r.estimated_revenue as revenue,
+    r.product_amount,
+    r.discount_amount
+FROM raw_orders r
+LEFT JOIN stores s ON r.store_code = s.code
+$WHERE_CLAUSE
+ORDER BY r.order_date DESC
+LIMIT $LIMIT;"
+
+# 显示查询条件
+[ -n "$DATE" ] && echo -e "${YELLOW}📅 日期: $DATE${NC}"
+[ -n "$PLATFORM" ] && echo -e "${YELLOW}🔌 平台: $PLATFORM${NC}"
+[ -n "$STORE" ] && echo -e "${YELLOW}🏪 店铺: $STORE${NC}"
+[ -z "$DATE" ] && [ -z "$PLATFORM" ] && [ -z "$STORE" ] && echo -e "${YELLOW}📊 最近 $LIMIT 条订单${NC}"
 
 echo ""
 

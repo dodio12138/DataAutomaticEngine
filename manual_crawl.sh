@@ -20,7 +20,8 @@ ${CYAN}用法：${NC}
   ./manual_crawl.sh [选项] [起始日期] [结束日期] [店铺代码]
 
 ${CYAN}选项：${NC}
-  --help, -h    显示此帮助信息
+  --help, -h           显示此帮助信息
+  --platform, -p       指定平台 (hungrypanda, deliveroo 或 all, 默认: all)
 
 ${CYAN}参数：${NC}
   起始日期      爬取的开始日期 (YYYY-MM-DD 格式，可选)
@@ -28,20 +29,26 @@ ${CYAN}参数：${NC}
   店铺代码      店铺英文代码或 'all' (默认: all)
 
 ${CYAN}示例：${NC}
-  ${GREEN}# 爬取昨天所有店铺的数据（默认）${NC}
+  ${GREEN}# 爬取昨天所有店铺的数据（默认两个平台）${NC}
   ./manual_crawl.sh
 
-  ${GREEN}# 爬取12-24当天所有店铺${NC}
+  ${GREEN}# 仅爬取 HungryPanda 平台${NC}
+  ./manual_crawl.sh --platform hungrypanda
+
+  ${GREEN}# 仅爬取 Deliveroo 平台${NC}
+  ./manual_crawl.sh -p deliveroo
+
+  ${GREEN}# 爬取12-24当天所有店铺（两个平台）${NC}
   ./manual_crawl.sh 2025-12-24
 
-  ${GREEN}# 爬取12-24当天指定店铺${NC}
-  ./manual_crawl.sh 2025-12-24 battersea_maocai
+  ${GREEN}# 爬取12-24当天指定店铺和平台${NC}
+  ./manual_crawl.sh --platform hungrypanda 2025-12-24 battersea_maocai
 
   ${GREEN}# 爬取12-20到12-24（5天）所有店铺${NC}
   ./manual_crawl.sh 2025-12-20 2025-12-25
 
-  ${GREEN}# 爬取12-20到12-24指定店铺${NC}
-  ./manual_crawl.sh 2025-12-20 2025-12-25 battersea_maocai
+  ${GREEN}# 爬取12-20到12-24指定店铺（仅 Deliveroo）${NC}
+  ./manual_crawl.sh -p deliveroo 2025-12-20 2025-12-25 battersea_maocai
 
 ${CYAN}可用店铺代码：${NC}
   all                - 所有店铺（默认）
@@ -84,6 +91,13 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     show_help
 fi
 
+# 解析平台参数
+PLATFORM="all"
+if [ "$1" = "--platform" ] || [ "$1" = "-p" ]; then
+    PLATFORM="$2"
+    shift 2
+fi
+
 # 解析参数
 START_DATE="${1}"
 END_DATE="${2}"
@@ -121,6 +135,7 @@ fi
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  手动触发爬虫 - 批量模式${NC}"
 echo -e "${BLUE}========================================${NC}"
+echo -e "${CYAN}平台选择: ${PLATFORM}${NC}"
 echo -e "${CYAN}起始日期: ${START_DATE}${NC}"
 echo -e "${CYAN}结束日期: ${END_DATE}${NC}"
 echo -e "${YELLOW}店铺代码: ${STORE_CODE}${NC}"
@@ -178,7 +193,8 @@ while [[ "$current_date" < "$END_DATE" ]]; do
 {
   "store_code": "${STORE_CODE}",
   "start_date": "${current_date}",
-  "end_date": "${next_date}"
+  "end_date": "${next_date}",
+  "platform": "${PLATFORM}"
 }
 EOF
 )

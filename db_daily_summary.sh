@@ -15,7 +15,8 @@ ${CYAN}用法：${NC}
   ./db_daily_summary.sh [选项] [起始日期] [结束日期]
 
 ${CYAN}选项：${NC}
-  --help, -h    显示此帮助信息
+  --help, -h           显示此帮助信息
+  --platform, -p       指定平台 (hungrypanda, deliveroo 或 all, 默认: all)
 
 ${CYAN}参数：${NC}
   起始日期      查询的开始日期 (YYYY-MM-DD 格式，可选)
@@ -27,17 +28,26 @@ ${CYAN}参数：${NC}
   - 提供两个日期时，查询日期范围内的数据
 
 ${CYAN}示例：${NC}
-  ${GREEN}# 查看昨天的数据${NC}
+  ${GREEN}# 查看昨天的数据（所有平台）${NC}
   ./db_daily_summary.sh
+
+  ${GREEN}# 查看昨天仅 HungryPanda 平台数据${NC}
+  ./db_daily_summary.sh --platform hungrypanda
+
+  ${GREEN}# 查看昨天仅 Deliveroo 平台数据${NC}
+  ./db_daily_summary.sh -p deliveroo
 
   ${GREEN}# 查看指定日期（2025-12-24）${NC}
   ./db_daily_summary.sh 2025-12-24
 
+  ${GREEN}# 查看指定日期仅 Deliveroo 平台${NC}
+  ./db_daily_summary.sh --platform deliveroo 2025-12-24
+
   ${GREEN}# 查看日期范围（2025-12-20 到 2025-12-24）${NC}
   ./db_daily_summary.sh 2025-12-20 2025-12-24
 
-  ${GREEN}# 查看本周数据${NC}
-  ./db_daily_summary.sh 2025-12-23 2025-12-26
+  ${GREEN}# 查看本周数据（仅 HungryPanda）${NC}
+  ./db_daily_summary.sh -p hungrypanda 2025-12-23 2025-12-26
 
 ${CYAN}输出内容：${NC}
   📈 时段总体数据    - 总订单数、总营收、平均客单价等
@@ -72,6 +82,16 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     show_help
 fi
 
+# 解析平台参数
+PLATFORM_FILTER=""
+if [ "$1" = "--platform" ] || [ "$1" = "-p" ]; then
+    PLATFORM_ARG="$2"
+    if [ "$PLATFORM_ARG" != "all" ]; then
+        PLATFORM_FILTER="AND platform = '$PLATFORM_ARG'"
+    fi
+    shift 2
+fi
+
 # 默认日期：昨天
 if [ -z "$1" ]; then
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -92,8 +112,11 @@ else
     fi
 fi
 
+PLATFORM_LABEL=""
+[ -n "$PLATFORM_ARG" ] && [ "$PLATFORM_ARG" != "all" ] && PLATFORM_LABEL=" (${PLATFORM_ARG})"
+
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}  📊 ${DATE_LABEL} 汇总${NC}"
+echo -e "${BLUE}  📊 ${DATE_LABEL} 汇总${PLATFORM_LABEL}${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
@@ -113,7 +136,7 @@ docker exec -it delivery_postgres psql -U delivery_user -d delivery_data -c "
         ROUND(SUM(product_amount)::numeric, 2) as 商品金额,
         ROUND(SUM(discount_amount)::numeric, 2) as 优惠金额
     FROM raw_orders
-    WHERE DATE(order_date) >= '$START_DATE' AND DATE(order_date) <= '$END_DATE';
+    WHERE DATE(order_date) >= '$START_DATE' AND DATE(order_date) <= '$END_DATE' $PLATFORM_FILTER;
 "
 
 # 2. 各店铺数据
@@ -127,7 +150,7 @@ docker exec -it delivery_postgres psql -U delivery_user -d delivery_data -c "
         ROUND(SUM(r.discount_amount)::numeric, 2) as 优惠
     FROM raw_orders r
     LEFT JOIN stores s ON r.store_code = s.code
-    WHERE DATE(r.order_date) >= '$START_DATE' AND DATE(r.order_date) <= '$END_DATE'
+    WHERE DATE(r.order_date) >= '$START_DATE' AND DATE(r.order_date) <= '$END_DATE' $PLATFORM_FILTER
     GROUP BY COALESCE(s.name_cn, r.store_name)
     ORDER BY COUNT(DISTINCT r.order_id) DESC;
 "
@@ -140,7 +163,7 @@ docker exec -it delivery_postgres psql -U delivery_user -d delivery_data -c "
         COUNT(DISTINCT order_id) as 数量,
         ROUND(SUM(estimated_revenue)::numeric, 2) as 营收
     FROM raw_orders
-    WHERE DATE(order_date) >= '$START_DATE' AND DATE(order_date) <= '$END_DATE'
+    WHERE DATE(order_date) >= '$START_DATE' AND DATE(order_date) <= '$END_DATE' $PLATFORM_FILTER
     GROUP BY platform
     ORDER BY COUNT(DISTINCT order_id) DESC;
 "
@@ -155,7 +178,7 @@ if [ "$START_DATE" != "$END_DATE" ]; then
             ROUND(SUM(estimated_revenue)::numeric, 2) as 营收,
             ROUND(AVG(estimated_revenue)::numeric, 2) as 客单价
         FROM raw_orders
-        WHERE DATE(order_date) >= '$START_DATE' AND DATE(order_date) <= '$END_DATE'
+        WHERE DATE(order_date) >= '$START_DATE' AND DATE(order_date) <= '$END_DATE' $PLATFORM_FILTER
         GROUP BY DATE(order_date)
         ORDER BY DATE(order_date);
     "
@@ -169,7 +192,7 @@ docker exec -it delivery_postgres psql -U delivery_user -d delivery_data -c "
         COUNT(DISTINCT order_id) as 订单数,
         ROUND(SUM(estimated_revenue)::numeric, 2) as 营收
     FROM raw_orders
-    WHERE DATE(order_date) >= '$START_DATE' AND DATE(order_date) <= '$END_DATE'
+    WHERE DATE(order_date) >= '$START_DATE' AND DATE(order_date) <= '$END_DATE' $PLATFORM_FILTER
     GROUP BY EXTRACT(HOUR FROM order_date)
     ORDER BY EXTRACT(HOUR FROM order_date);
 "
