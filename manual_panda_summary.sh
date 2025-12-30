@@ -165,28 +165,73 @@ RESPONSE=$(curl -s -X POST http://localhost:8000/run/panda/daily-summary \
     -d "$JSON_DATA")
 
 # 检查响应
-if echo "$RESPONSE" | grep -q '"exit_code":0' || echo "$RESPONSE" | grep -q '"exit_code": 0'; then
-    echo -e "${GREEN}✅ 任务已提交成功${NC}"
+if [ -z "$RESPONSE" ]; then
+    echo -e "${RED}❌ 无响应，请检查 API 服务是否运行${NC}"
+    exit 1
+fi
+
+# 检查是否包含严重错误（排除 409 日志错误）
+if echo "$RESPONSE" | grep -q '"detail"' && ! echo "$RESPONSE" | grep -q '409 Client Error'; then
+    echo -e "${RED}❌ 请求失败${NC}"
+    echo "$RESPONSE" | grep -o '"detail":"[^"]*"' | sed 's/"detail":"/错误: /' | sed 's/"$//'
+    exit 1
+fi
+
+# 409 错误通常是日志获取冲突，但任务已执行，直接验证数据
+if echo "$RESPONSE" | grep -q '409 Client Error'; then
+    echo -e "${YELLOW}⚠️  容器日志获取冲突（409），但任务可能已执行${NC}"
+    echo -e "${YELLOW}⏳ 正在验证数据...${NC}"
+    sleep 2
+else
+    echo -e "${GREEN}✅ 任务已提交${NC}"
+fi
+
+# 验证数据是否成功写入
+echo ""
+echo -e "${BLUE}========================================${NC}"
+echo -e "${BLUE}📊 数据验证${NC}"
+echo -e "${BLUE}========================================${NC}"
+
+if [ -n "$DATE" ]; then
+    # 单日查询
+    QUERY="SELECT store_code, store_name, gross_sales, net_sales, order_count, avg_order_value FROM daily_sales_summary WHERE date = '$DATE' AND platform = 'panda'"
+    if [ "$STORES" != "all" ]; then
+        QUERY="$QUERY AND store_code = '$STORES'"
+    fi
+    QUERY="$QUERY ORDER BY store_code;"
+else
+    # 日期范围查询
+    QUERY="SELECT date, store_code, SUM(gross_sales) as gross_sales, SUM(net_sales) as net_sales, SUM(order_count) as order_count FROM daily_sales_summary WHERE date BETWEEN '$START_DATE' AND '$END_DATE' AND platform = 'panda'"
+    if [ "$STORES" != "all" ]; then
+        QUERY="$QUERY AND store_code = '$STORES'"
+    fi
+    QUERY="$QUERY GROUP BY date, store_code ORDER BY date DESC, store_code;"
+fi
+
+RESULT=$(docker exec delivery_postgres psql -U delivery_user -d delivery_data -t -c "$QUERY" 2>&1)
+
+if [ $? -eq 0 ] && [ -n "$RESULT" ] && [ "$(echo "$RESULT" | grep -v '^$' | wc -l)" -gt 0 ]; then
+    echo -e "${GREEN}✅ 数据已成功写入${NC}"
+    echo "$RESULT"
     echo ""
-    echo -e "${YELLOW}📝 提示：${NC}"
-    echo "  - 任务将在后台执行，通常需要 10-30 秒"
-    echo "  - 从 raw_orders 表聚合计算数据"
-    echo "  - 结果写入 daily_sales_summary 表"
-    echo "  - 使用以下命令查看结果："
+    echo -e "${YELLOW}📝 完整查看：${NC}"
+    if [ -n "$DATE" ]; then
+        echo -e "${BLUE}    ./db_view_daily_summary.sh --platform panda --date $DATE${NC}"
+    else
+        echo -e "${BLUE}    ./db_view_daily_summary.sh --platform panda --date $START_DATE${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠️  未找到数据或数据为空${NC}"
+    echo -e "${YELLOW}可能原因：${NC}"
+    echo -e "  1. raw_orders 表中无对应日期的订单数据"
+    echo -e "  2. 任务仍在执行中，请稍后查询"
     echo ""
+    echo -e "${YELLOW}📝 手动查询：${NC}"
     if [ -n "$DATE" ]; then
         echo -e "${BLUE}    ./db_view_daily_summary.sh --platform panda --date $DATE${NC}"
     else
         echo -e "${BLUE}    ./db_view_daily_summary.sh --platform panda --days 10${NC}"
     fi
-    echo ""
-elif echo "$RESPONSE" | grep -q 'detail'; then
-    echo -e "${RED}❌ 请求失败${NC}"
-    echo "$RESPONSE" | grep -o '"detail":"[^"]*"' | sed 's/"detail":"/错误: /' | sed 's/"$//'
-    exit 1
-else
-    echo -e "${GREEN}✅ 请求已发送${NC}"
-    echo "$RESPONSE"
 fi
 
 echo ""
