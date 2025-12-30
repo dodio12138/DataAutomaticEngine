@@ -25,7 +25,7 @@ show_help() {
                      省略则重构所有主要服务（db, api, scheduler）
 
 注意：
-  - crawler 镜像会自动重构（无论是否指定）
+  - crawler 和 etl 镜像会自动重构（无论是否指定）
   - 默认使用 --no-cache 确保完全重新构建
 
 示例：
@@ -115,7 +115,7 @@ else
     echo -e "${CYAN}📦 构建缓存: 保留${NC}"
 fi
 
-echo -e "${GREEN}🔄 Crawler 镜像: 总是重构${NC}"
+echo -e "${GREEN}🔄 Crawler & ETL 镜像: 总是重构${NC}"
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  容器重构脚本${NC}"
@@ -248,7 +248,7 @@ for service in "${SERVICES_TO_REBUILD[@]}"; do
     fi
 done
 
-# 始终构建 crawler 镜像（即使不在服务列表中）
+# 始终构建 crawler 和 etl 镜像（即使不在服务列表中）
 echo -e "${YELLOW}🔨 构建 crawler 镜像（独立镜像）${NC}"
 docker build --no-cache -t dataautomaticengine-crawler ./crawler
 
@@ -257,6 +257,15 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 echo -e "${GREEN}✅ crawler 镜像构建完成${NC}"
+
+echo -e "${YELLOW}🔨 构建 etl 镜像（独立镜像）${NC}"
+docker build --no-cache -t dataautomaticengine-etl ./etl
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}❌ etl 镜像构建失败${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ etl 镜像构建完成${NC}"
 
 if [ ${#BUILD_SERVICES[@]} -gt 0 ]; then
     echo -e "${YELLOW}🔨 构建服务镜像: ${BUILD_SERVICES[*]}${NC}"

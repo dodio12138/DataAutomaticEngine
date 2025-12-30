@@ -12,11 +12,13 @@
 # 每日汇总计算任务 (Daily Summary Calculation)
 # ============================================
 
-# 每天凌晨6点执行 Deliveroo 每日汇总爬取（等待5点订单爬虫完成，抓取昨天的汇总数据）
-0 6 * * * /bin/bash -c 'sleep 300 && curl -s -X POST http://api:8000/run/deliveroo/daily-summary -H "Content-Type: application/json" -d '"'"'{"stores":["all"],"date":"$(date -d yesterday +\%Y-\%m-\%d)"}'"'"' >> /var/log/cron-deliveroo-summary.log 2>&1'
+# 每天凌晨6点执行 Deliveroo 每日汇总爬取（等待5点订单爬虫完成）
+# API 默认使用当天，但爬取的是昨天的数据
+0 6 * * * /bin/bash -c 'sleep 300 && curl -s -X POST http://api:8000/run/deliveroo/daily-summary -H "Content-Type: application/json" -d '"'"'{"stores":["all"]}'"'"' >> /var/log/cron-deliveroo-summary.log 2>&1'
 
 # 每天凌晨6点10分执行 HungryPanda ETL 计算（从 raw_orders 计算昨天的每日汇总）
-10 6 * * * /bin/bash -c 'sleep 60 && curl -s -X POST http://api:8000/run/panda/daily-summary -H "Content-Type: application/json" -d '"'"'{"store_code":"all","date":"$(date -d yesterday +\%Y-\%m-\%d)"}'"'"' >> /var/log/cron-panda-summary.log 2>&1'
+# API 默认使用昨天
+10 6 * * * /bin/bash -c 'sleep 60 && curl -s -X POST http://api:8000/run/panda/daily-summary -H "Content-Type: application/json" -d '"'"'{"store_code":"all"}'"'"' >> /var/log/cron-panda-summary.log 2>&1'
 
 # ============================================
 # 飞书推送任务 (Feishu Notification)
@@ -29,6 +31,7 @@
 # 飞书多维表格同步 (Feishu Bitable Sync)
 # ============================================
 
-# 每天早上7点30分同步昨天的数据到飞书多维表格
-30 7 * * * /bin/bash -c 'sleep 60 && curl -s -X POST http://api:8000/run/feishu-sync -H "Content-Type: application/json" -d '"'"'{"start_date":"$(date -d yesterday +\%Y-\%m-\%d)","end_date":"$(date -d yesterday +\%Y-\%m-\%d)"}'"'"' >> /var/log/cron-feishu-sync.log 2>&1'
+# 每天早上7点30分同步数据到飞书多维表格
+# API 默认同步最近7天数据，无需传参
+30 7 * * * /bin/bash -c 'sleep 60 && curl -s -X POST http://api:8000/run/feishu-sync >> /var/log/cron-feishu-sync.log 2>&1'
 
