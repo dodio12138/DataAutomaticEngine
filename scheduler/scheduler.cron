@@ -25,3 +25,10 @@
 # 每天早上9点发送昨日订单汇总（示例，可根据需要启用）
 0 9 * * * curl -s -X POST http://api:8000/reminder/daily-summary >> /var/log/cron-feishu.log 2>&1
 
+# ============================================
+# 飞书多维表格同步 (Feishu Bitable Sync)
+# ============================================
+
+# 每天早上7点30分同步昨天的数据到飞书多维表格
+30 7 * * * /bin/bash -c 'sleep 60 && curl -s -X POST http://api:8000/run/feishu-sync -H "Content-Type: application/json" -d '"'"'{"start_date":"$(date -d yesterday +\%Y-\%m-\%d)","end_date":"$(date -d yesterday +\%Y-\%m-\%d)"}'"'"' >> /var/log/cron-feishu-sync.log 2>&1'
+

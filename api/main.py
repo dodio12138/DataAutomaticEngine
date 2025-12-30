@@ -1,7 +1,7 @@
 """FastAPI 应用主入口"""
 from fastapi import FastAPI
 from utils import get_db_conn
-from routers import crawler, etl, reminder, feishu_bot
+from routers import crawler, etl, reminder, feishu_bot, feishu_sync
 from routers import deliveroo_summary, panda_summary
 from contextlib import asynccontextmanager
 import threading
@@ -54,6 +54,7 @@ app.include_router(panda_summary.router)
 app.include_router(etl.router)
 app.include_router(reminder.router)
 app.include_router(feishu_bot.router)
+app.include_router(feishu_sync.router)
 
 
 @app.get("/")
@@ -65,6 +66,7 @@ def root():
         "endpoints": {
             "health": "/health",
             "crawler": "/run/crawler",
+            "feishu_sync": "/run/feishu-sync",
             "etl": "/run/etl",
             "reminder": "/reminder/*",
             "feishu_bot": "/feishu/bot/*"
