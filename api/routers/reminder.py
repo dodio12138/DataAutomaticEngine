@@ -16,39 +16,68 @@ class CustomReminderRequest(BaseModel):
 
 
 @router.post("/daily-summary")
-def send_daily_summary():
+def send_daily_summary(platform: Optional[str] = None):
     """
     发送每日订单汇总
     
     定时任务接口：每天早上发送昨日订单汇总到飞书群
     
+    参数：
+    - platform: 可选，指定平台 ('panda', 'deliveroo'，不指定则查询所有平台)
+    
     示例 crontab 配置：
+    # 所有平台汇总（默认）
     0 9 * * * curl -s -X POST http://api:8000/reminder/daily-summary
+    
+    # 仅熊猫外卖
+    0 9 * * * curl -s -X POST "http://api:8000/reminder/daily-summary?platform=panda"
+    
+    # 仅 Deliveroo
+    0 9 * * * curl -s -X POST "http://api:8000/reminder/daily-summary?platform=deliveroo"
     """
     from datetime import timedelta
     
     # 获取昨天的日期
     date_str = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
     
+    # 标准化平台参数
+    if platform:
+        platform = platform.lower()
+        if platform in ['hungrypanda', 'panda']:
+            platform = 'panda'
+        elif platform in ['deliveroo', 'roo']:
+            platform = 'deliveroo'
+    
     # 查询汇总数据
-    summary_data = report_service.query_order_summary(date_str)
+    summary_data = report_service.query_order_summary(date_str, platform=platform)
+    
+    # 设置标题前缀
+    if platform == 'panda':
+        platform_emoji = '🐼'
+        platform_name = '熊猫外卖'
+    elif platform == 'deliveroo':
+        platform_emoji = '🦘'
+        platform_name = 'Deliveroo'
+    else:
+        platform_emoji = '📊'
+        platform_name = '全平台'
     
     if not summary_data['success']:
         # 如果查询失败，发送文本消息
         result = feishu_service.send_with_default_webhook(
-            f"📊 熊猫外卖 {date_str} 数据汇总\n\n{summary_data['message']}"
+            f"{platform_emoji} {platform_name} {date_str} 数据汇总\n\n{summary_data['message']}"
         )
     else:
         # 发送卡片消息
         result = feishu_service.send_daily_summary_card(summary_data)
     
     # 同时生成文本汇总供返回
-    summary_text = report_service.generate_daily_summary_text(date_str)
+    summary_text = report_service.generate_daily_summary_text(date_str, platform=platform)
     
     if result['success']:
         return {
             'status': 'ok',
-            'message': '每日汇总已发送',
+            'message': f'{platform_name}每日汇总已发送',
             'timestamp': datetime.now().isoformat(),
             'summary': summary_text
         }
@@ -94,31 +123,45 @@ def send_custom_message(req: CustomReminderRequest):
 
 
 @router.post("/store-summary")
-def send_store_summary(store_name: str, date: Optional[str] = None):
+def send_store_summary(store_name: str, date: Optional[str] = None, platform: Optional[str] = None):
     """
     发送指定店铺的订单汇总
     
     参数：
     - store_name: 店铺名称
     - date: 日期 YYYY-MM-DD（可选，默认昨天）
+    - platform: 平台 ('panda', 'deliveroo'，不指定则查询所有平台)
     
     示例：
+    # 所有平台
     curl -X POST "http://localhost:8000/reminder/store-summary?store_name=Battersea&date=2025-12-20"
+    
+    # 仅熊猫外卖
+    curl -X POST "http://localhost:8000/reminder/store-summary?store_name=Battersea&date=2025-12-20&platform=panda"
     """
     # 生成店铺汇总报告
     if not date:
         from datetime import timedelta
         date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
     
-    summary = report_service.generate_store_summary_text(store_name, date)
+    # 标准化平台参数
+    if platform:
+        platform = platform.lower()
+        if platform in ['hungrypanda', 'panda']:
+            platform = 'panda'
+        elif platform in ['deliveroo', 'roo']:
+            platform = 'deliveroo'
+    
+    summary = report_service.generate_store_summary_text(store_name, date, platform=platform)
     
     # 发送到飞书
     result = feishu_service.send_with_default_webhook(summary)
     
     if result['success']:
+        platform_info = f" ({platform})" if platform else ""
         return {
             'status': 'ok',
-            'message': f'店铺 {store_name} 的汇总已发送',
+            'message': f'店铺 {store_name}{platform_info} 的汇总已发送',
             'timestamp': datetime.now().isoformat(),
             'summary': summary
         }

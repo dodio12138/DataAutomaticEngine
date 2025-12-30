@@ -111,6 +111,11 @@ class CommandParser:
         """
         params = {}
         
+        # 提取平台参数（所有命令通用）
+        platform = self._extract_platform(text)
+        if platform:
+            params['platform'] = platform
+        
         if command_type == 'query_orders':
             # 提取日期
             if match.group(1):
@@ -185,3 +190,30 @@ class CommandParser:
             date = today - timedelta(days=1)
         
         return date.strftime('%Y-%m-%d')
+    
+    def _extract_platform(self, text: str) -> Optional[str]:
+        """
+        从文本中提取平台参数
+        
+        参数：
+        - text: 用户输入文本
+        
+        返回：
+        - str: 'hungrypanda', 'deliveroo', 'panda', 或 None（查询所有平台）
+        """
+        text_lower = text.lower()
+        
+        # HungryPanda 平台关键词
+        if 'hungrypanda' in text_lower or 'hungry panda' in text_lower:
+            return 'hungrypanda'
+        if 'panda' in text_lower or '熊猫' in text or '🐼' in text:
+            return 'panda'
+        
+        # Deliveroo 平台关键词
+        if 'deliveroo' in text_lower or 'deliver oo' in text_lower:
+            return 'deliveroo'
+        if 'roo' in text_lower or '袋鼠' in text or '🦘' in text:
+            return 'deliveroo'
+        
+        # 默认返回 None，表示查询所有平台
+        return None

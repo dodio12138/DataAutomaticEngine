@@ -2,7 +2,9 @@
 
 ## 当前定时任务
 
-### 1. HungryPanda 爬虫（凌晨4点）
+### 数据爬取阶段
+
+#### 1. HungryPanda 订单爬虫（凌晨4点）
 ```cron
 0 4 * * * 抓取所有 HungryPanda 店铺订单
 ```
@@ -10,9 +12,10 @@
 - **随机延迟**：1-5分钟（避免同时请求）
 - **平台**：panda
 - **店铺范围**：all（所有店铺）
+- **数据存储**：raw_orders 表
 - **日志文件**：`/var/log/cron-panda.log`
 
-### 2. Deliveroo 爬虫（凌晨5点）
+#### 2. Deliveroo 订单爬虫（凌晨5点）
 ```cron
 0 5 * * * 抓取所有 Deliveroo 店铺订单
 ```
@@ -20,43 +23,159 @@
 - **随机延迟**：1-5分钟（避免同时请求）
 - **平台**：deliveroo
 - **店铺范围**：all（所有店铺）
+- **数据存储**：raw_orders 表
 - **日志文件**：`/var/log/cron-deliveroo.log`
 
-### 3. 昨日订单汇总（早上9点）
+### 汇总计算阶段
+
+#### 3. Deliveroo 每日汇总爬虫（凌晨6点）
+```cron
+0 6 * * * 爬取 Deliveroo 每日销售汇总
+```
+- **执行时间**：每天凌晨 6:00（等待5点订单爬虫完成）
+- **延迟**：5分钟（确保订单爬虫完成）
+- **数据来源**：Deliveroo Summary API
+- **店铺范围**：all（所有店铺）
+- **日期**：昨天
+- **数据存储**：daily_sales_summary 表
+- **日志文件**：`/var/log/cron-deliveroo-summary.log`
+
+#### 4. HungryPanda ETL 汇总计算（凌晨6点10分）
+```cron
+10 6 * * * 计算 HungryPanda 每日销售汇总
+```
+- **执行时间**：每天凌晨 6:10（等待4点订单爬虫完成）
+- **延迟**：1分钟（缓冲时间）
+- **数据来源**：raw_orders 表（聚合计算）
+- **店铺范围**：all（所有店铺）
+- **日期**：昨天
+- **数据存储**：daily_sales_summary 表
+- **日志文件**：`/var/log/cron-panda-summary.log`
+
+### 飞书推送阶段
+
+#### 5. 昨日订单汇总推送（早上9点）
 ```cron
 0 9 * * * 发送昨日订单汇总到飞书
 ```
 - **执行时间**：每天早上 9:00
-- **功能**：推送昨日订单统计
+- **数据来源**：daily_sales_summary 表
+- **功能**：推送昨日全平台订单统计
+- **日志文件**：`/var/log/cron-feishu.log`
 
-## 时间安排说明
+## 完整流程时间线
 
-### 为什么分开执行？
-1. **避免资源冲突**：两个平台同时爬取可能导致内存/CPU 峰值
-2. **降低风险**：一个平台失败不影响另一个
-3. **便于追踪**：独立的日志文件便于问题排查
-4. **符合业务节奏**：HungryPanda 通常订单更多，优先处理
+```
+03:00-04:00  ▶ HungryPanda 平台订单陆续完成
+04:00        ▶ 【任务1】HungryPanda 订单爬虫启动
+04:01-04:05  ▶ 随机延迟后开始爬取
+04:30        ▶ 订单数据写入 raw_orders 表
 
-### 时间选择理由
-- **4:00** - 熊猫订单通常在凌晨3点后基本完成
-- **5:00** - Deliveroo 订单延后1小时，错峰处理
-- **9:00** - 工作时间开始，便于查看昨日数据
+05:00        ▶ 【任务2】Deliveroo 订单爬虫启动
+05:01-05:05  ▶ 随机延迟后开始爬取
+05:30        ▶ 订单数据写入 raw_orders 表
+
+06:00        ▶ 【任务3】Deliveroo 每日汇总爬虫启动
+06:05        ▶ 延迟5分钟后开始爬取
+06:10        ▶ 【任务4】HungryPanda ETL 计算启动
+06:15        ▶ 汇总数据写入 daily_sales_summary 表
+
+09:00        ▶ 【任务5】飞书推送昨日汇总
+09:00        ▶ 管理人员收到数据报告
+```
+
+## 设计理念
+
+### 1. 分阶段执行
+- **阶段1（4:00-5:30）**：原始订单数据爬取
+- **阶段2（6:00-6:15）**：汇总数据计算
+- **阶段3（9:00）**：数据推送通知
+
+### 2. 错峰处理
+1. **避免资源冲突**：两个平台订单爬虫错开1小时
+2. **汇总依赖**：等待订单数据完成后再计算汇总
+3. **降低风险**：一个平台失败不影响另一个
+
+### 3. 数据一致性
+- 订单爬虫完成 → 汇总计算开始
+- 汇总数据入库 → 飞书推送读取
+- 避免推送时数据未准备好
+
+### 4. 便于监控
+- 独立的日志文件便于问题排查
+- 明确的时间节点便于追踪进度
+- 失败时可单独重跑某个阶段
 
 ## 日志查看
 
-### 查看 HungryPanda 爬虫日志
+### 查看订单爬虫日志
 ```bash
+# HungryPanda 订单爬虫
 docker exec dataautomaticengine-scheduler-1 tail -f /var/log/cron-panda.log
+
+# Deliveroo 订单爬虫
+docker exec dataautomaticengine-scheduler-1 tail -f /var/log/cron-deliveroo.log
 ```
 
-### 查看 Deliveroo 爬虫日志
+### 查看汇总计算日志
 ```bash
-docker exec dataautomaticengine-scheduler-1 tail -f /var/log/cron-deliveroo.log
+# Deliveroo 每日汇总爬虫
+docker exec dataautomaticengine-scheduler-1 tail -f /var/log/cron-deliveroo-summary.log
+
+# HungryPanda ETL 汇总计算
+docker exec dataautomaticengine-scheduler-1 tail -f /var/log/cron-panda-summary.log
+```
+
+### 查看飞书推送日志
+```bash
+docker exec dataautomaticengine-scheduler-1 tail -f /var/log/cron-feishu.log
 ```
 
 ### 查看系统 cron 日志
 ```bash
 docker logs dataautomaticengine-scheduler-1
+```
+
+## 手动触发任务
+
+### 触发订单爬虫
+```bash
+# HungryPanda 订单爬虫
+curl -X POST http://localhost:8000/run/crawler \
+  -H "Content-Type: application/json" \
+  -d '{"platform":"panda","store_code":"all"}'
+
+# Deliveroo 订单爬虫
+curl -X POST http://localhost:8000/run/crawler \
+  -H "Content-Type: application/json" \
+  -d '{"platform":"deliveroo","store_code":"all"}'
+```
+
+### 触发汇总计算
+```bash
+# Deliveroo 每日汇总（指定日期）
+curl -X POST http://localhost:8000/run/deliveroo/daily-summary \
+  -H "Content-Type: application/json" \
+  -d '{"stores":["all"],"date":"2025-12-22"}'
+
+# HungryPanda ETL 汇总计算（指定日期）
+curl -X POST http://localhost:8000/run/panda/daily-summary \
+  -H "Content-Type: application/json" \
+  -d '{"store_code":"all","date":"2025-12-22"}'
+
+# 批量计算多日（12-20 到 12-27）
+curl -X POST http://localhost:8000/run/deliveroo/daily-summary \
+  -H "Content-Type: application/json" \
+  -d '{"stores":["all"],"start_date":"2025-12-20","end_date":"2025-12-27"}'
+
+curl -X POST http://localhost:8000/run/panda/daily-summary \
+  -H "Content-Type: application/json" \
+  -d '{"store_code":"all","start_date":"2025-12-20","end_date":"2025-12-27"}'
+```
+
+### 触发飞书推送
+```bash
+curl -X POST http://localhost:8000/reminder/daily-summary
 ```
 
 ## 修改定时任务

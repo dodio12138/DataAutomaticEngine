@@ -32,3 +32,24 @@ CREATE TABLE IF NOT EXISTS raw_orders (
 CREATE INDEX IF NOT EXISTS idx_raw_orders_platform_order ON raw_orders(platform, order_id);
 CREATE INDEX IF NOT EXISTS idx_raw_orders_store_time ON raw_orders(store_code, created_at);
 CREATE INDEX IF NOT EXISTS idx_raw_orders_order_date ON raw_orders(order_date);
+
+-- 每日销售汇总表：用于存储每个店铺每天的销售汇总数据
+CREATE TABLE IF NOT EXISTS daily_sales_summary (
+    id SERIAL PRIMARY KEY,
+    date DATE NOT NULL,
+    store_code VARCHAR(64) NOT NULL,
+    store_name VARCHAR(128),
+    platform VARCHAR(32) NOT NULL,
+    gross_sales NUMERIC(10,2),
+    net_sales NUMERIC(10,2),
+    order_count INTEGER,
+    avg_order_value NUMERIC(10,2),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(date, store_code, platform)
+);
+
+-- 每日汇总索引
+CREATE INDEX IF NOT EXISTS idx_daily_sales_date ON daily_sales_summary(date);
+CREATE INDEX IF NOT EXISTS idx_daily_sales_store ON daily_sales_summary(store_code);
+CREATE INDEX IF NOT EXISTS idx_daily_sales_platform ON daily_sales_summary(platform);

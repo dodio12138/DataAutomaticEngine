@@ -42,24 +42,25 @@ class Responder:
         创建订单查询响应
         
         参数：
-        - params: 查询参数（包含date等）
+        - params: 查询参数（包含date, platform等）
         
         返回：
         - Dict: 飞书消息响应
         """
         date = params.get('date')
+        platform = params.get('platform')
         
         if not date:
             return self._create_text_response("❌ 请指定查询日期，例如：查询2025-12-22")
         
         # 查询订单数据
-        result = report_service.query_order_summary(date)
+        result = report_service.query_order_summary(date, platform=platform)
         
         if not result['success']:
             return self._create_text_response(f"❌ {result['message']}")
         
         # 生成汇总文本
-        summary_text = report_service.generate_daily_summary_text(date)
+        summary_text = report_service.generate_daily_summary_text(date, platform=platform)
         
         return self._create_text_response(summary_text)
     
@@ -68,7 +69,7 @@ class Responder:
         创建每日汇总响应
         
         参数：
-        - params: 参数（包含 start_date, end_date 或 date）
+        - params: 参数（包含 start_date, end_date, platform 或 date）
         
         返回：
         - Dict: 飞书消息响应
@@ -76,9 +77,10 @@ class Responder:
         # 支持新的 start_date/end_date 和旧的 date 参数
         start_date = params.get('start_date') or params.get('date')
         end_date = params.get('end_date')
+        platform = params.get('platform')
         
         # 生成汇总报告
-        summary_text = report_service.generate_daily_summary_text(start_date, end_date)
+        summary_text = report_service.generate_daily_summary_text(start_date, end_date, platform)
         
         return self._create_text_response(summary_text)
     
@@ -87,7 +89,7 @@ class Responder:
         创建店铺汇总响应
         
         参数：
-        - params: 参数（包含 store_name, start_date, end_date 或 date）
+        - params: 参数（包含 store_name, start_date, end_date, platform 或 date）
         
         返回：
         - Dict: 飞书消息响应
@@ -95,6 +97,7 @@ class Responder:
         store_name = params.get('store_name', '').strip()
         start_date = params.get('start_date') or params.get('date')
         end_date = params.get('end_date')
+        platform = params.get('platform')
         
         if not store_name or store_name == '':
             return self._create_text_response("❌ 请指定店铺名称")
@@ -103,7 +106,7 @@ class Responder:
             return self._create_text_response("❌ 请指定查询日期")
         
         # 生成店铺汇总
-        summary_text = report_service.generate_store_summary_text(store_name, start_date, end_date)
+        summary_text = report_service.generate_store_summary_text(store_name, start_date, end_date, platform)
         
         return self._create_text_response(summary_text)
     
@@ -143,12 +146,25 @@ class Responder:
 4️⃣ **帮助信息**
    • 帮助 / help
 
+🌐 **平台筛选（可选）**
+   在任何查询命令后添加平台关键词：
+   • panda / 熊猫 / 🐼 → 仅查询 HungryPanda
+   • deliveroo / roo / 袋鼠 / 🦘 → 仅查询 Deliveroo
+   • 不指定 → 查询所有平台
+   
+   示例：
+   • 昨天汇总 panda （仅 HungryPanda）
+   • Battersea店 2025-12-24 deliveroo （仅 Deliveroo）
+   • 2025-12-24 （所有平台）
+
 💡 提示：
    • 日期格式：YYYY-MM-DD
-   • 多日查询会显示数据汇总
+   • 多日查询会显示数据汇总和每日趋势
    • 支持中文/英文店铺名模糊匹配
    • 日期分隔符：至、-、到
-🐼 数据来源：HungryPanda / Deliveroo"""
+   • 平台筛选支持多种关键词
+
+🐼 数据来源：HungryPanda / 🦘 Deliveroo"""
         
         return self._create_text_response(help_text)
     
