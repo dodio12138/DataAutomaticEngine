@@ -129,6 +129,8 @@ async def test_command(text: str):
         response = responder.create_daily_summary_response(params)
     elif command_type == 'store_summary':
         response = responder.create_store_summary_response(params)
+    elif command_type == 'store_rating':
+        response = responder.create_store_rating_response(params)
     elif command_type == 'help':
         response = responder.create_help_response()
     else:

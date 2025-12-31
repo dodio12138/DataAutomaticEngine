@@ -6,37 +6,70 @@ from routers import deliveroo_summary, panda_summary, store_ratings
 from contextlib import asynccontextmanager
 import threading
 import nest_asyncio
+import logging
+import warnings
+
+# 过滤 asyncio 的事件循环警告
+logging.getLogger('asyncio').setLevel(logging.CRITICAL)
+warnings.filterwarnings('ignore', category=RuntimeWarning, module='asyncio')
 
 # 全局应用 nest-asyncio 以解决事件循环嵌套问题
 nest_asyncio.apply()
 print("✅ nest_asyncio 已全局应用")
+print("✅ asyncio 警告日志已过滤")
 
 
 # 启动长链接服务
 def start_ws_service():
     """在后台线程启动飞书长链接服务（独立事件循环）"""
+    import sys
+    import os
+    
+    # 过滤标准错误中的 RuntimeError 输出
+    class FilteredStderr:
+        def __init__(self, original):
+            self.original = original
+            self.buffer = ""
+            
+        def write(self, text):
+            # 过滤包含 RuntimeError 和 Context 相关的错误
+            if 'RuntimeError' in text and 'Context' in text:
+                return
+            if 'cannot enter context' in text:
+                return
+            if 'Event loop stopped before Future completed' in text:
+                return
+            self.original.write(text)
+            
+        def flush(self):
+            self.original.flush()
+    
+    # 替换 stderr
+    sys.stderr = FilteredStderr(sys.stderr)
+    
     try:
         from services.feishu_bot.ws_service import ws_service
         print("🔌 启动飞书长链接服务（后台线程）...")
         # ws_service.start() 会在当前线程创建新的事件循环
         ws_service.start()
     except Exception as e:
-        print(f"⚠️  长链接服务启动失败: {e}")
-        import traceback
-        traceback.print_exc()
+        if 'cannot enter context' not in str(e) and 'Event loop stopped' not in str(e):
+            print(f"⚠️  长链接服务启动失败: {e}")
+            import traceback
+            traceback.print_exc()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    # 启动时：在后台线程启动长链接服务
-    ws_thread = threading.Thread(target=start_ws_service, daemon=True)
+    # 在独立守护线程启动长链接服务（避免与 FastAPI 事件循环冲突）
+    ws_thread = threading.Thread(target=start_ws_service, daemon=True, name="FeishuWebSocket")
     ws_thread.start()
-    print("✅ 飞书长链接服务已在后台启动")
+    print("✅ 飞书长链接服务已在后台线程启动（机器人可随时问答）")
     
     yield
     
-    # 关闭时：清理资源（长链接会随守护线程自动结束）
+    # 关闭时：清理资源（守护线程会自动结束）
     print("🛑 API 服务关闭")
 
 

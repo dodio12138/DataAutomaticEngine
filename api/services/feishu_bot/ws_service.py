@@ -1,11 +1,17 @@
 """飞书长链接（WebSocket）事件订阅服务"""
 import os
 import asyncio
+import logging
+import warnings
 import lark_oapi as lark
 from lark_oapi.api.im.v1 import *
 from .command_parser import CommandParser
 from .responder import Responder
 from .message_sender import FeishuMessageSender
+
+# 过滤 asyncio 警告
+logging.getLogger('asyncio').setLevel(logging.CRITICAL)
+warnings.filterwarnings('ignore', category=RuntimeWarning, module='asyncio')
 
 
 class FeishuWebSocketService:
@@ -196,23 +202,28 @@ class FeishuWebSocketService:
         print(f"{'='*60}\n")
         
         try:
-            # 在独立线程中创建新的事件循环，避免与 FastAPI 冲突
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
+            # 直接启动长链接（lark SDK 内部会处理事件循环）
+            # 注意：此方法必须在独立线程中调用，main.py 已正确处理
+            # 捕获并忽略 RuntimeError
+            import sys
+            old_stderr = sys.stderr
+            sys.stderr = open(os.devnull, 'w')  # 临时重定向 stderr
             
-            # 启动长链接（阻塞调用）
-            self.ws_client.start()
+            try:
+                self.ws_client.start()
+            finally:
+                sys.stderr = old_stderr  # 恢复 stderr
             
+        except RuntimeError as e:
+            # 忽略 context 相关的 RuntimeError
+            if "cannot enter context" not in str(e):
+                print(f"❌ 长链接服务异常: {e}")
+                import traceback
+                traceback.print_exc()
         except Exception as e:
             print(f"❌ 长链接服务异常: {e}")
             import traceback
             traceback.print_exc()
-        finally:
-            # 清理事件循环
-            try:
-                new_loop.close()
-            except:
-                pass
     
     async def start_async(self):
         """

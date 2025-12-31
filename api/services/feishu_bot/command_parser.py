@@ -13,8 +13,14 @@ class CommandParser:
     def __init__(self):
         # 定义命令模式（可扩展）
         # 注意：匹配顺序很重要！具体的模式要放在通用模式之前
-        self.patterns = {
-            'store_summary': [
+        self.patterns = {            'store_rating': [
+                # 评分查询必须放在最前面
+                r'查询\s*(.+?)\s*评分',
+                r'(.+?)\s*评分',
+                r'评分\s*(.+?)',
+                r'([a-zA-Z]\w+)\s+rating',
+                r'rating\s+([a-zA-Z]\w+)',
+            ],            'store_summary': [
                 # 店铺查询必须放在最前面，避免被其他模式误匹配
                 # 支持"查询 店铺名 日期"格式（日期范围）
                 r'查询\s*(.+?)\s*(\d{4}-\d{2}-\d{2})\s*至\s*(\d{4}-\d{2}-\d{2})',
@@ -75,9 +81,18 @@ class CommandParser:
         - Dict: 解析后的命令字典，包含 type 和 params
         - None: 无法识别的命令
         """
-        # 清理文本：移除@提及标记（如 @_user_1）
+        # 清理文本：移除@提及标记
+        # 1. 移除 @所有人 标记
+        text = re.sub(r'@所有人\s*', '', text)
+        text = re.sub(r'@all\s*', '', text, flags=re.IGNORECASE)
+        # 2. 移除飞书 XML 格式的 @所有人：<at user_id="all">所有人</at>
+        text = re.sub(r'<at\s+user_id=["\']all["\']>.*?</at>\s*', '', text, flags=re.IGNORECASE)
+        # 3. 移除用户提及标记（如 @_user_1）
         text = re.sub(r'@_user_\d+\s*', '', text)
-        text = re.sub(r'@\S+\s*', '', text)  # 移除任何@标记
+        # 4. 移除飞书 XML 格式的用户提及：<at user_id="xxxxx">用户名</at>
+        text = re.sub(r'<at\s+user_id=["\'][^"\']+["\']>.*?</at>\s*', '', text)
+        # 5. 移除其他@标记
+        text = re.sub(r'@\S+\s*', '', text)
         text = text.strip()
         
         if not text:
@@ -162,6 +177,19 @@ class CommandParser:
             elif len(dates) == 1:
                 params['start_date'] = dates[0]
                 params['end_date'] = dates[0]
+        
+        elif command_type == 'store_rating':
+            # 提取店铺名
+            groups = match.groups()
+            store_name = None
+            
+            for group in groups:
+                if group and group.strip():
+                    store_name = group.replace('店铺', '').replace('店', '').strip()
+                    break
+            
+            if store_name and store_name != '':
+                params['store_name'] = store_name
         
         return params
     

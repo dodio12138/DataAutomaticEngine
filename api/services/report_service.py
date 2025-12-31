@@ -477,3 +477,142 @@ def generate_store_summary_text(store_name: str, start_date: str, end_date: Opti
             lines.append(f"📊 客单：£{store['avg_revenue']:.2f}")
             lines.append("")
         return "\n".join(lines)
+
+
+def query_store_rating(store_name: str) -> dict:
+    """
+    查询店铺评分数据(从 store_ratings 表)
+    
+    参数:
+    - store_name: 店铺名(支持模糊匹配)
+    
+    返回:
+    - dict: 包含 success, message, data 的字典
+    """
+    if not store_name or store_name.strip() == '':
+        return {
+            'success': False,
+            'message': '请指定店铺名称'
+        }
+    
+    conn = get_db_conn()
+    cursor = conn.cursor()
+    
+    try:
+        # 获取最新日期的评分数据
+        # 先尝试精确匹配
+        exact_query = """
+            SELECT 
+                r.date,
+                r.store_code,
+                r.store_name,
+                r.platform,
+                r.average_rating,
+                r.rating_count,
+                r.five_star_count,
+                r.four_star_count,
+                r.three_star_count,
+                r.two_star_count,
+                r.one_star_count
+            FROM store_ratings r
+            WHERE (
+                LOWER(r.store_code) = LOWER(%s)
+                OR LOWER(r.store_name) = LOWER(%s)
+            )
+            ORDER BY r.date DESC
+            LIMIT 1
+        """
+        cursor.execute(exact_query, (store_name, store_name))
+        result = cursor.fetchone()
+        
+        # 如果精确匹配没结果,使用模糊匹配
+        if not result:
+            search_pattern = f"%{store_name}%"
+            fuzzy_query = """
+                SELECT 
+                    r.date,
+                    r.store_code,
+                    r.store_name,
+                    r.platform,
+                    r.average_rating,
+                    r.rating_count,
+                    r.five_star_count,
+                    r.four_star_count,
+                    r.three_star_count,
+                    r.two_star_count,
+                    r.one_star_count
+                FROM store_ratings r
+                WHERE (
+                    LOWER(r.store_name) LIKE LOWER(%s)
+                    OR LOWER(r.store_code) LIKE LOWER(%s)
+                )
+                ORDER BY r.date DESC
+                LIMIT 1
+            """
+            cursor.execute(fuzzy_query, (search_pattern, search_pattern))
+            result = cursor.fetchone()
+        
+        if not result:
+            return {
+                'success': False,
+                'message': f'未找到店铺"{store_name}"的评分数据'
+            }
+        
+        # 构造返回数据
+        data = {
+            'date': result[0],
+            'store_code': result[1],
+            'store_name': result[2],
+            'platform': result[3],
+            'average_rating': float(result[4]),
+            'rating_count': result[5],
+            'five_star_count': result[6],
+            'four_star_count': result[7],
+            'three_star_count': result[8],
+            'two_star_count': result[9],
+            'one_star_count': result[10]
+        }
+        
+        # 查询前一天的数据用于对比
+        from datetime import datetime, timedelta
+        current_date = result[0]
+        previous_date = (datetime.strptime(str(current_date), '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
+        
+        previous_query = """
+            SELECT 
+                r.average_rating,
+                r.rating_count,
+                r.five_star_count,
+                r.one_star_count
+            FROM store_ratings r
+            WHERE (
+                LOWER(r.store_code) = LOWER(%s)
+                OR LOWER(r.store_name) = LOWER(%s)
+            )
+            AND r.date = %s
+            LIMIT 1
+        """
+        cursor.execute(previous_query, (result[1], result[2], previous_date))
+        previous_result = cursor.fetchone()
+        
+        if previous_result:
+            data['previous_data'] = {
+                'average_rating': float(previous_result[0]),
+                'rating_count': previous_result[1],
+                'five_star_count': previous_result[2],
+                'one_star_count': previous_result[3]
+            }
+        
+        return {
+            'success': True,
+            'data': data
+        }
+    
+    except Exception as e:
+        return {
+            'success': False,
+            'message': f'查询失败: {str(e)}'
+        }
+    finally:
+        cursor.close()
+        conn.close()
