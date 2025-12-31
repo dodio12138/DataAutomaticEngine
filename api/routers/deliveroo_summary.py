@@ -1,7 +1,7 @@
 """Deliveroo 日销售汇总触发路由（临时容器执行）"""
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from docker.errors import APIError
 import os
 
@@ -47,7 +47,8 @@ def run_deliveroo_daily_summary(req: DailySummaryRequest):
     elif req.start_date and req.end_date:
         dates_arg = f"{req.start_date.strip()},{req.end_date.strip()}"
     else:
-        dates_arg = date.today().strftime('%Y-%m-%d')
+        # 默认前一天
+        dates_arg = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d')
 
     # 环境变量（数据库）
     env_dict = get_db_env_dict()
