@@ -8,6 +8,7 @@ store_dict_panda = {
     "海底捞冒菜（巴特西）": "689260161",
     "海底捞冒菜（Brent）": "843479068",
     "海底捞冒菜（塔桥）": "622889629",
+    "海底捞火锅（Piccadilly）东区专送": "318426504",
     # "海底捞冒菜（Wood Green）": "750724472"
 }
 
@@ -18,6 +19,7 @@ store_login_user = {
     "海底捞冒菜（巴特西）": "8888888888",
     "海底捞冒菜（Brent）": "8888888888",
     "海底捞冒菜（塔桥）": "7346357000",
+    "海底捞火锅（Piccadilly）东区专送": "8888888888",
 }
 
 store_login_password = {
@@ -27,6 +29,7 @@ store_login_password = {
     "海底捞冒菜（巴特西）": "q26PU5Qr0",
     "海底捞冒菜（Brent）": "q26PU5Qr0",
     "海底捞冒菜（塔桥）": "hdl12345",
+    "海底捞火锅（Piccadilly）东区专送": "q26PU5Qr0",
 }
 
 store_dict_deliveroo = {
@@ -52,6 +55,7 @@ store_code_map = {
     "battersea_maocai": "海底捞冒菜（巴特西）",
     "brent_maocai": "海底捞冒菜（Brent）",
     "towerbridge_maocai": "海底捞冒菜（塔桥）",
+    "piccadilly_hotpot_east": "海底捞火锅（Piccadilly）东区专送",
 }
 
 # 反向映射：中文名 → 英文代码
