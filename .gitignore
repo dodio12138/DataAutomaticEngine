@@ -61,3 +61,4 @@ htmlcov/
 *.bak
 *.swp
 *~.nib
+api/__pycache__/main.cpython-311.pyc
