@@ -24,12 +24,13 @@ def parse_and_insert_order(conn, raw_order_data: Dict, store_code: str = None):
     try:
         # 1. 插入订单主表
         order_id = raw_order_data.get('drn_id') or raw_order_data.get('id')
+        restaurant_id = raw_order_data.get('restaurant_id', store_code or 'unknown')
         
         # 金额信息
         amount = raw_order_data.get('amount', {})
         total_amount = amount.get('fractional', 0) / 100.0 if amount else 0.0  # 转换为实际金额
         
-        currency = amount.get('currency_code', 'GBP') if amount else 'GBP'
+        currency_code = amount.get('currency_code', 'GBP') if amount else 'GBP'
         
         # 订单状态
         status = raw_order_data.get('status', 'completed')
@@ -38,18 +39,18 @@ def parse_and_insert_order(conn, raw_order_data: Dict, store_code: str = None):
         timeline = raw_order_data.get('timeline', {})
         placed_at = timeline.get('placed_at') if timeline else None
         accepted_at = timeline.get('accepted_at') if timeline else None
-        delivered_at = timeline.get('delivery_picked_up_at') if timeline else None
+        delivery_picked_up_at = timeline.get('delivery_picked_up_at') if timeline else None
         
-        # 插入订单（只使用通用字段）
+        # 插入订单（匹配实际表结构）
         cursor.execute("""
             INSERT INTO orders (
-                order_id, platform, store_code,
-                total_amount, currency,
+                order_id, platform, store_code, restaurant_id,
+                total_amount, currency_code,
                 status,
-                placed_at, accepted_at, delivered_at,
+                placed_at, accepted_at, delivery_picked_up_at,
                 raw_data
             ) VALUES (
-                %s, %s, %s,
+                %s, %s, %s, %s,
                 %s, %s,
                 %s,
                 %s, %s, %s,
@@ -58,14 +59,14 @@ def parse_and_insert_order(conn, raw_order_data: Dict, store_code: str = None):
             ON CONFLICT (order_id, platform) DO UPDATE SET
                 status = EXCLUDED.status,
                 total_amount = EXCLUDED.total_amount,
-                delivered_at = EXCLUDED.delivered_at,
+                delivery_picked_up_at = EXCLUDED.delivery_picked_up_at,
                 raw_data = EXCLUDED.raw_data
             RETURNING id
         """, (
-            order_id, 'deliveroo', store_code,
-            total_amount, currency,
+            order_id, 'deliveroo', store_code, restaurant_id,
+            total_amount, currency_code,
             status,
-            placed_at, accepted_at, delivered_at,
+            placed_at, accepted_at, delivery_picked_up_at,
             json.dumps(raw_order_data)
         ))
         
@@ -93,7 +94,7 @@ def parse_and_insert_order(conn, raw_order_data: Dict, store_code: str = None):
             total_unit_price_data = item.get('total_unit_price', {})
             total_unit_price = total_unit_price_data.get('fractional', 0) / 100.0
             
-            # 插入菜品
+            # 插入菜品（使用订单的字符串ID，不是数据库自增ID）
             cursor.execute("""
                 INSERT INTO order_items (
                     order_id, item_name, category_name, quantity,
