@@ -56,13 +56,13 @@ def parse_and_insert_order(conn, raw_order_data: Dict, store_code: str = None):
         # 插入订单
         cursor.execute("""
             INSERT INTO orders (
-                order_id, short_drn, order_number, restaurant_id, store_code,
+                order_id, platform, short_drn, order_number, restaurant_id, store_code,
                 total_amount, paid_in_cash, currency_code,
                 status, rejection_reason,
                 placed_at, accepted_at, confirmed_at, prepare_for, delivery_picked_up_at,
                 customer_id, raw_data
             ) VALUES (
-                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s,
                 %s, %s, %s,
                 %s, %s,
                 %s, %s, %s, %s, %s,
@@ -74,7 +74,7 @@ def parse_and_insert_order(conn, raw_order_data: Dict, store_code: str = None):
                 delivery_picked_up_at = EXCLUDED.delivery_picked_up_at
             RETURNING id
         """, (
-            order_id, short_drn, order_number, restaurant_id, store_code,
+            order_id, 'deliveroo', short_drn, order_number, restaurant_id, store_code,
             total_amount, paid_cash_amount, currency_code,
             status, rejection_reason,
             placed_at, accepted_at, confirmed_at, prepare_for, delivery_picked_up_at,
