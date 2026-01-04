@@ -100,19 +100,51 @@ fi
 # 发送请求
 echo -e "${YELLOW}开始同步...${NC}\n"
 
-RESPONSE=$(curl -s -X POST "$API_URL" \
+RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$API_URL" \
     -H "Content-Type: application/json" \
     -d "$JSON_DATA")
 
+# 分离响应体和状态码
+HTTP_BODY=$(echo "$RESPONSE" | sed -e 's/HTTP_STATUS\:.*//g')
+HTTP_STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTP_STATUS://')
+
+echo -e "${BLUE}HTTP 状态码: $HTTP_STATUS${NC}"
+
+# 检查 HTTP 状态码
+if [ "$HTTP_STATUS" != "200" ]; then
+    echo -e "${RED}========================================${NC}"
+    echo -e "${RED}❌ 请求失败 (HTTP $HTTP_STATUS)${NC}"
+    echo -e "${RED}========================================${NC}"
+    
+    if [ "$HTTP_STATUS" == "500" ]; then
+        echo -e "${YELLOW}这是服务器内部错误，可能原因：${NC}"
+        echo -e "1. 飞书 API Token 无效或过期"
+        echo -e "2. 环境变量配置缺失"
+        echo -e "3. Docker 容器创建失败"
+        echo -e "4. 数据库连接问题"
+        echo -e ""
+        echo -e "${BLUE}建议运行诊断脚本：${NC}"
+        echo -e "  ./diagnose_feishu_sync.sh"
+    fi
+    
+    echo -e "\n${YELLOW}响应详情:${NC}"
+    echo "$HTTP_BODY" | python3 -m json.tool 2>/dev/null || echo "$HTTP_BODY"
+    
+    echo -e "\n${BLUE}查看 API 日志：${NC}"
+    echo -e "  docker logs delivery_api --tail 50"
+    
+    exit 1
+fi
+
 # 解析响应
-STATUS=$(echo "$RESPONSE" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+STATUS=$(echo "$HTTP_BODY" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
 
 if [ "$STATUS" == "success" ]; then
     echo -e "${GREEN}========================================${NC}"
     echo -e "${GREEN}✅ 同步成功！${NC}"
     echo -e "${GREEN}========================================${NC}"
     
-    LOG_FILE=$(echo "$RESPONSE" | grep -o '"log_file":"[^"]*"' | cut -d'"' -f4)
+    LOG_FILE=$(echo "$HTTP_BODY" | grep -o '"log_file":"[^"]*"' | cut -d'"' -f4)
     if [ -n "$LOG_FILE" ]; then
         echo -e "${BLUE}日志文件: $LOG_FILE${NC}"
         echo -e "${BLUE}查看详细日志: cat $LOG_FILE${NC}"
@@ -122,11 +154,19 @@ else
     echo -e "${RED}❌ 同步失败${NC}"
     echo -e "${RED}========================================${NC}"
     
-    EXIT_CODE=$(echo "$RESPONSE" | grep -o '"exit_code":[0-9]*' | cut -d':' -f2)
-    echo -e "${RED}退出码: $EXIT_CODE${NC}"
+    EXIT_CODE=$(echo "$HTTP_BODY" | grep -o '"exit_code":[0-9]*' | cut -d':' -f2)
+    if [ -n "$EXIT_CODE" ]; then
+        echo -e "${RED}退出码: $EXIT_CODE${NC}"
+    else
+        echo -e "${YELLOW}⚠️  未获取到退出码，可能是容器启动失败${NC}"
+    fi
     
     echo -e "\n${YELLOW}响应详情:${NC}"
-    echo "$RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$RESPONSE"
+    echo "$HTTP_BODY" | python3 -m json.tool 2>/dev/null || echo "$HTTP_BODY"
+    
+    echo -e "\n${BLUE}查看更多信息：${NC}"
+    echo -e "  docker logs delivery_api --tail 50"
+    echo -e "  ./diagnose_feishu_sync.sh"
     
     exit 1
 fi

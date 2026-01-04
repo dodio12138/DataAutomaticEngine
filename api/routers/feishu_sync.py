@@ -78,6 +78,10 @@ def run_feishu_sync(req: FeishuSyncRequest):
         command.extend(["--platform", req.platform])
     
     try:
+        print(f"🚀 创建飞书同步容器: {container_name}")
+        print(f"📝 命令: {' '.join(command)}")
+        print(f"🔑 环境变量数量: {len(env_dict)}")
+        
         # 创建临时容器（连接到 docker compose 网络）- 不自动删除
         container = client.containers.run(
             image="dataautomaticengine-feishu-sync",
@@ -94,9 +98,13 @@ def run_feishu_sync(req: FeishuSyncRequest):
             detach=True
         )
         
-        # 等待容器执行完成
-        result = container.wait()
+        print(f"⏳ 等待容器执行完成...")
+        
+        # 等待容器执行完成（设置超时）
+        result = container.wait(timeout=300)  # 5分钟超时
         exit_code = result['StatusCode']
+        
+        print(f"✅ 容器执行完成，退出码: {exit_code}")
         
         # 获取日志
         logs = container.logs(stdout=True, stderr=True).decode('utf-8', errors='ignore')
@@ -135,6 +143,12 @@ def run_feishu_sync(req: FeishuSyncRequest):
             }
     
     except APIError as e:
-        raise HTTPException(status_code=500, detail=f"Docker 容器创建失败: {str(e)}")
+        error_msg = f"Docker 容器创建失败: {str(e)}"
+        print(f"❌ {error_msg}")
+        raise HTTPException(status_code=500, detail=error_msg)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"未知错误: {str(e)}")
+        error_msg = f"未知错误: {type(e).__name__} - {str(e)}"
+        print(f"❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=error_msg)

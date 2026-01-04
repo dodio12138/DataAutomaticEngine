@@ -18,36 +18,42 @@ class FeishuBitableSync:
     """飞书多维表格同步器"""
     
     def __init__(self):
-        # 飞书应用配置
-        self.app_id = os.environ.get("FEISHU_APP_ID")
-        self.app_secret = os.environ.get("FEISHU_APP_SECRET")
-        self.app_token = os.environ.get("FEISHU_BITABLE_APP_TOKEN")  # 多维表格 app_token
-        self.table_id = os.environ.get("FEISHU_BITABLE_TABLE_ID")    # 数据表 table_id
-        
-        # 用户 Access Token（优先使用，如果配置了的话）
-        self.user_access_token = os.environ.get("FEISHU_USER_ACCESS_TOKEN")
-        
-        # DEBUG: 打印环境变量状态
-        print(f"DEBUG - USER_ACCESS_TOKEN 配置: {'已设置' if self.user_access_token else '未设置'}")
-        if self.user_access_token:
-            print(f"DEBUG - TOKEN前缀: {self.user_access_token[:10]}...")
-        
-        if not all([self.app_token, self.table_id]):
-            raise ValueError("缺少飞书配置：FEISHU_BITABLE_APP_TOKEN, FEISHU_BITABLE_TABLE_ID")
-        
-        # 获取 access_token
-        # 优先使用 user_access_token，否则使用 tenant_access_token
-        if self.user_access_token:
-            print("✅ 使用 user_access_token（用户身份）")
-            self.access_token = self.user_access_token
-        else:
-            if not all([self.app_id, self.app_secret]):
-                raise ValueError("缺少飞书配置：FEISHU_APP_ID, FEISHU_APP_SECRET")
-            print("✅ 使用 tenant_access_token（应用身份）")
-            self.access_token = self._get_tenant_access_token()
-        
-        # 飞书 API 基础 URL
-        self.base_url = "https://open.feishu.cn/open-apis"
+        try:
+            # 飞书应用配置
+            self.app_id = os.environ.get("FEISHU_APP_ID")
+            self.app_secret = os.environ.get("FEISHU_APP_SECRET")
+            self.app_token = os.environ.get("FEISHU_BITABLE_APP_TOKEN")  # 多维表格 app_token
+            self.table_id = os.environ.get("FEISHU_BITABLE_TABLE_ID")    # 数据表 table_id
+            
+            # 用户 Access Token（优先使用，如果配置了的话）
+            self.user_access_token = os.environ.get("FEISHU_USER_ACCESS_TOKEN")
+            
+            # DEBUG: 打印环境变量状态
+            print(f"DEBUG - USER_ACCESS_TOKEN 配置: {'已设置' if self.user_access_token else '未设置'}")
+            if self.user_access_token:
+                print(f"DEBUG - TOKEN前缀: {self.user_access_token[:10]}...")
+            
+            if not all([self.app_token, self.table_id]):
+                raise ValueError("缺少飞书配置：FEISHU_BITABLE_APP_TOKEN, FEISHU_BITABLE_TABLE_ID")
+            
+            # 获取 access_token
+            # 优先使用 user_access_token，否则使用 tenant_access_token
+            if self.user_access_token:
+                print("✅ 使用 user_access_token（用户身份）")
+                self.access_token = self.user_access_token
+            else:
+                if not all([self.app_id, self.app_secret]):
+                    raise ValueError("缺少飞书配置：FEISHU_APP_ID, FEISHU_APP_SECRET")
+                print("✅ 使用 tenant_access_token（应用身份）")
+                self.access_token = self._get_tenant_access_token()
+            
+            # 飞书 API 基础 URL
+            self.base_url = "https://open.feishu.cn/open-apis"
+        except Exception as e:
+            print(f"❌ 初始化失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
         
         # 数据库配置
         self.db_config = {
