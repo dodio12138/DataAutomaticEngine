@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS orders (
     order_id VARCHAR(100) NOT NULL,               -- 订单唯一ID（字符串）
     short_drn VARCHAR(50),                        -- Deliveroo 短订单号
     order_number VARCHAR(50),                     -- 订单号
-    restaurant_id VARCHAR(50) NOT NULL,           -- 餐厅ID
+    restaurant_id VARCHAR(50),                    -- 餐厅ID（先设为可空，后面补充数据后改为 NOT NULL）
     store_code VARCHAR(50),                       -- 店铺代码
     platform VARCHAR(20) DEFAULT 'deliveroo',     -- 平台（deliveroo/hungrypanda）
     
@@ -76,6 +76,65 @@ CREATE TABLE IF NOT EXISTS orders (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 如果表已存在，添加缺失的字段
+DO $$ 
+BEGIN
+    -- 添加 short_drn
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='short_drn') THEN
+        ALTER TABLE orders ADD COLUMN short_drn VARCHAR(50);
+    END IF;
+    
+    -- 添加 order_number
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='order_number') THEN
+        ALTER TABLE orders ADD COLUMN order_number VARCHAR(50);
+    END IF;
+    
+    -- 添加 restaurant_id
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='restaurant_id') THEN
+        ALTER TABLE orders ADD COLUMN restaurant_id VARCHAR(50);
+    END IF;
+    
+    -- 添加 paid_in_cash
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='paid_in_cash') THEN
+        ALTER TABLE orders ADD COLUMN paid_in_cash NUMERIC(10,2);
+    END IF;
+    
+    -- 添加 currency_code
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='currency_code') THEN
+        ALTER TABLE orders ADD COLUMN currency_code VARCHAR(10) DEFAULT 'GBP';
+    END IF;
+    
+    -- 添加 rejection_reason
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='rejection_reason') THEN
+        ALTER TABLE orders ADD COLUMN rejection_reason TEXT;
+    END IF;
+    
+    -- 添加 confirmed_at
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='confirmed_at') THEN
+        ALTER TABLE orders ADD COLUMN confirmed_at TIMESTAMP;
+    END IF;
+    
+    -- 添加 prepare_for
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='prepare_for') THEN
+        ALTER TABLE orders ADD COLUMN prepare_for TIMESTAMP;
+    END IF;
+    
+    -- 添加 delivery_picked_up_at
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='delivery_picked_up_at') THEN
+        ALTER TABLE orders ADD COLUMN delivery_picked_up_at TIMESTAMP;
+    END IF;
+    
+    -- 添加 customer_id
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='customer_id') THEN
+        ALTER TABLE orders ADD COLUMN customer_id INTEGER;
+    END IF;
+    
+    -- 确保 platform 字段存在且有默认值
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='platform') THEN
+        ALTER TABLE orders ADD COLUMN platform VARCHAR(20) DEFAULT 'deliveroo';
+    END IF;
+END $$;
+
 -- 订单表唯一约束（防止重复导入）
 CREATE UNIQUE INDEX IF NOT EXISTS unique_deliveroo_order ON orders(order_id, platform);
 
@@ -101,6 +160,28 @@ CREATE TABLE IF NOT EXISTS order_items (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 如果表已存在，确保字段长度正确
+DO $$ 
+BEGIN
+    -- 检查并修改 item_name 字段长度（如果当前是 VARCHAR(512) 改为 500）
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name='order_items' AND column_name='item_name'
+        AND character_maximum_length != 500
+    ) THEN
+        ALTER TABLE order_items ALTER COLUMN item_name TYPE VARCHAR(500);
+    END IF;
+    
+    -- 检查并修改 category_name 字段长度
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name='order_items' AND column_name='category_name'
+        AND character_maximum_length != 255
+    ) THEN
+        ALTER TABLE order_items ALTER COLUMN category_name TYPE VARCHAR(255);
+    END IF;
+END $$;
+
 -- 订单项索引
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_item_name ON order_items(item_name);
@@ -114,10 +195,31 @@ CREATE TABLE IF NOT EXISTS order_item_modifiers (
     
     modifier_name VARCHAR(500) NOT NULL,          -- 添加项名称
     
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE CASCADE
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 如果表已存在，确保外键存在
+DO $$ 
+BEGIN
+    -- 添加外键约束（如果不存在）
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'order_item_modifiers_order_item_id_fkey'
+    ) THEN
+        ALTER TABLE order_item_modifiers 
+        ADD CONSTRAINT order_item_modifiers_order_item_id_fkey 
+        FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE CASCADE;
+    END IF;
+    
+    -- 检查并修改 modifier_name 字段长度
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name='order_item_modifiers' AND column_name='modifier_name'
+        AND character_maximum_length != 500
+    ) THEN
+        ALTER TABLE order_item_modifiers ALTER COLUMN modifier_name TYPE VARCHAR(500);
+    END IF;
+END $$;
 
 -- 添加项索引
 CREATE INDEX IF NOT EXISTS idx_order_item_modifiers_order_item_id ON order_item_modifiers(order_item_id);
