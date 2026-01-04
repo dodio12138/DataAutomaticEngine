@@ -21,16 +21,16 @@ show_help() {
 
 参数：
   服务名             要重构的服务名称（多个用空格分隔）
-                     可用服务：api, crawler, etl, scheduler, db
+                     可用服务：api, crawler, etl, feishu-sync, scheduler, db
                      省略则重构所有主要服务（db, api, scheduler）
 
 注意：
-  - crawler 和 etl 镜像会自动重构（无论是否指定）
+  - crawler、etl 和 feishu-sync 镜像会自动重构（无论是否指定）
   - 默认使用 --no-cache 确保完全重新构建
 
 示例：
   ./rebuild.sh                      # 重构所有主要服务（保留数据库数据）
-  ./rebuild.sh api                  # 仅重构 api 服务（crawler 也会重构）
+  ./rebuild.sh api                  # 仅重构 api 服务（crawler、etl、feishu-sync 也会重构）
   ./rebuild.sh --clean-images       # 重构所有服务并删除旧镜像
   ./rebuild.sh --clear-cache        # 重构并清除 Docker 构建缓存
   ./rebuild.sh --clean-images --clear-cache  # 清理镜像和缓存
@@ -77,7 +77,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # 可用服务列表
-AVAILABLE_SERVICES=("api" "crawler" "etl" "scheduler" "db")
+AVAILABLE_SERVICES=("api" "crawler" "etl" "feishu-sync" "scheduler" "db")
 ALL_SERVICES=("db" "api" "scheduler")  # 默认重构的服务（需构建的）
 
 # 解析参数
@@ -115,7 +115,7 @@ else
     echo -e "${CYAN}📦 构建缓存: 保留${NC}"
 fi
 
-echo -e "${GREEN}🔄 Crawler & ETL 镜像: 总是重构${NC}"
+echo -e "${GREEN}🔄 Crawler、ETL、Feishu-Sync 镜像: 总是重构${NC}"
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  容器重构脚本${NC}"
@@ -181,13 +181,16 @@ if [ "$CLEAN_IMAGES" = true ]; then
     echo -e "${CYAN}步骤 3/5: 删除旧镜像${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
-    # 始终清理 crawler 镜像
-    echo -e "${YELLOW}🗑️  删除镜像: dataautomaticengine-crawler${NC}"
-    if docker images -q "dataautomaticengine-crawler" 2>/dev/null | grep -q .; then
-        docker rmi -f "dataautomaticengine-crawler" 2>/dev/null || echo -e "${YELLOW}⚠️  镜像 dataautomaticengine-crawler 可能正在被使用，跳过删除${NC}"
-    else
-        echo -e "${CYAN}ℹ️  镜像 dataautomaticengine-crawler 不存在，无需删除${NC}"
-    fi
+    # 始终清理 crawler、etl 和 feishu-sync 镜像
+    for img in "crawler" "etl" "feishu-sync"; do
+        image_name="dataautomaticengine-${img}"
+        echo -e "${YELLOW}🗑️  删除镜像: ${image_name}${NC}"
+        if docker images -q "${image_name}" 2>/dev/null | grep -q .; then
+            docker rmi -f "${image_name}" 2>/dev/null || echo -e "${YELLOW}⚠️  镜像 ${image_name} 可能正在被使用，跳过删除${NC}"
+        else
+            echo -e "${CYAN}ℹ️  镜像 ${image_name} 不存在，无需删除${NC}"
+        fi
+    done
     
     for service in "${SERVICES_TO_REBUILD[@]}"; do
         if [ "$service" = "db" ]; then
@@ -195,8 +198,8 @@ if [ "$CLEAN_IMAGES" = true ]; then
             continue
         fi
         
-        # 跳过 crawler，已经处理过了
-        if [ "$service" = "crawler" ]; then
+        # 跳过已处理的独立镜像
+        if [ "$service" = "crawler" ] || [ "$service" = "etl" ] || [ "$service" = "feishu-sync" ]; then
             continue
         fi
         
@@ -248,7 +251,7 @@ for service in "${SERVICES_TO_REBUILD[@]}"; do
     fi
 done
 
-# 始终构建 crawler 和 etl 镜像（即使不在服务列表中）
+# 始终构建 crawler、etl 和 feishu-sync 镜像（即使不在服务列表中）
 echo -e "${YELLOW}🔨 构建 crawler 镜像（独立镜像）${NC}"
 docker build --no-cache -t dataautomaticengine-crawler ./crawler
 
@@ -266,6 +269,15 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 echo -e "${GREEN}✅ etl 镜像构建完成${NC}"
+
+echo -e "${YELLOW}🔨 构建 feishu-sync 镜像（独立镜像）${NC}"
+docker build --no-cache -t dataautomaticengine-feishu-sync ./feishu_sync
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}❌ feishu-sync 镜像构建失败${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ feishu-sync 镜像构建完成${NC}"
 
 if [ ${#BUILD_SERVICES[@]} -gt 0 ]; then
     echo -e "${YELLOW}🔨 构建服务镜像: ${BUILD_SERVICES[*]}${NC}"

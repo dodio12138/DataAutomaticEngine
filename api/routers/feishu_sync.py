@@ -28,8 +28,8 @@ def run_feishu_sync(req: FeishuSyncRequest):
     - 支持增量更新（已存在则更新，不存在则创建）
     - 默认同步全部已知数据，可指定日期范围
     """
-    # 确保镜像存在
-    ensure_image_exists("dataautomaticengine-feishu-sync", "../feishu_sync")
+    # 确保镜像存在（如果不存在会自动构建）
+    ensure_image_exists("dataautomaticengine-feishu-sync", "feishu_sync")
     
     # 构建环境变量（包含 DB 和飞书配置）
     env_dict = get_db_env_dict()

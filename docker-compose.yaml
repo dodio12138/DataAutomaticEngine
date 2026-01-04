@@ -29,7 +29,8 @@ services:
     volumes:
       - ./api:/app
       - ./api/logs:/app/logs  # 日志目录
-      - /var/run/docker.sock:/var/run/docker.sock  # ★关键
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker socket，用于创建临时容器
+      - .:/workspace  # 挂载项目根目录，用于构建其他服务的镜像
     ports:
       - "8000:8000"
     restart: unless-stopped
