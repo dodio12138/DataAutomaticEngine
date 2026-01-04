@@ -11,6 +11,9 @@
 # 每天凌晨5点执行 Deliveroo 爬虫任务（抓取所有店铺订单，随机延迟1-5分钟）
 0 5 * * * /bin/bash -c 'sleep $((60 + RANDOM % 240)) && curl -s -X POST http://api:8000/run/crawler -H "Content-Type: application/json" -d '"'"'{"platform":"deliveroo","store_code":"all"}'"'"' >> /var/log/cron-deliveroo.log 2>&1'
 
+# 每天凌晨5点30分执行 Deliveroo 订单详情导入（等待订单爬虫完成，导入昨天的新订单）
+30 5 * * * /bin/bash -c 'sleep 60 && curl -s -X POST http://api:8000/run/import-order-details -H "Content-Type: application/json" -d '"'"'{"days":1}'"'"' >> /var/log/cron-order-import.log 2>&1'
+
 # ============================================
 # 每日汇总计算任务 (Daily Summary Calculation)
 # ============================================

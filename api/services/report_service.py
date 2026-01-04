@@ -5,6 +5,59 @@ from typing import Optional
 from utils import get_db_conn
 
 
+def map_store_name_to_code(store_name: str) -> Optional[str]:
+    """
+    将店铺名映射到 store_code（用于 order_stats API）
+    
+    参数：
+    - store_name: 店铺名（支持中文/英文，模糊匹配）
+    
+    返回：
+    - str: store_code，如果找不到则返回 None
+    """
+    if not store_name or store_name.strip() == '':
+        return None
+    
+    conn = get_db_conn()
+    cursor = conn.cursor()
+    
+    try:
+        # 先尝试精确匹配 store_code 或 store_name
+        exact_query = """
+            SELECT DISTINCT store_code
+            FROM daily_sales_summary
+            WHERE LOWER(store_code) = LOWER(%s)
+               OR LOWER(store_name) = LOWER(%s)
+            LIMIT 1
+        """
+        cursor.execute(exact_query, [store_name, store_name])
+        result = cursor.fetchone()
+        
+        if result:
+            return result[0]
+        
+        # 精确匹配失败，尝试模糊匹配
+        fuzzy_query = """
+            SELECT DISTINCT store_code
+            FROM daily_sales_summary
+            WHERE LOWER(store_name) LIKE LOWER(%s)
+               OR LOWER(store_code) LIKE LOWER(%s)
+            LIMIT 1
+        """
+        search_pattern = f"%{store_name}%"
+        cursor.execute(fuzzy_query, [search_pattern, search_pattern])
+        result = cursor.fetchone()
+        
+        return result[0] if result else None
+        
+    except Exception as e:
+        print(f"❌ map_store_name_to_code 失败: {e}")
+        return None
+    finally:
+        cursor.close()
+        conn.close()
+
+
 def query_order_summary(start_date: str, end_date: Optional[str] = None, store_name: Optional[str] = None, platform: Optional[str] = None) -> dict:
     """
     查询指定日期或日期范围的订单汇总（从 daily_sales_summary 表读取）

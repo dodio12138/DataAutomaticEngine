@@ -123,18 +123,8 @@ async def test_command(text: str):
     command_type = command.get('type')
     params = command.get('params', {})
     
-    if command_type == 'query_orders':
-        response = responder.create_order_query_response(params)
-    elif command_type == 'daily_summary':
-        response = responder.create_daily_summary_response(params)
-    elif command_type == 'store_summary':
-        response = responder.create_store_summary_response(params)
-    elif command_type == 'store_rating':
-        response = responder.create_store_rating_response(params)
-    elif command_type == 'help':
-        response = responder.create_help_response()
-    else:
-        response = responder.create_unknown_command_response()
+    # 使用统一的 generate_response 方法
+    response = responder.generate_response(command)
     
     return {
         "text": text,

@@ -13,7 +13,26 @@ class CommandParser:
     def __init__(self):
         # 定义命令模式（可扩展）
         # 注意：匹配顺序很重要！具体的模式要放在通用模式之前
-        self.patterns = {            'store_rating': [
+        self.patterns = {
+            'hot_items': [
+                # 新格式：Top N [P] [店铺] [平台] [类型]
+                # 例如：Top 5 10 Battersea deliveroo main
+                r'(?i)top\s+(\d+)(?:\s+(\d+))?(?:\s+([a-zA-Z]\w+|.+店|.+店铺))?(?:\s+(deliveroo|panda|hungrypanda|roo|熊猫|袋鼠))?(?:\s+(main|modifier|summary|主产品|添加项|汇总))?',
+                
+                # 兼容旧格式：热门主产品/热门添加项/热门汇总
+                r'热门(主产品|添加项|汇总)',
+                r'热门菜品.*?(主产品|添加项|汇总)',
+                # 支持带店铺和日期的查询
+                r'(.+店|.+店铺|[a-zA-Z]\w+).*?热门(主产品|添加项|汇总|菜品).*?(\d{4}-\d{2}-\d{2})',
+                r'(\d{4}-\d{2}-\d{2}).*?(.+店|.+店铺|[a-zA-Z]\w+).*?热门(主产品|添加项|汇总|菜品)',
+                r'(.+店|.+店铺|[a-zA-Z]\w+).*?热门(主产品|添加项|汇总|菜品)',
+                r'(\d{4}-\d{2}-\d{2}).*?热门(主产品|添加项|汇总|菜品)',
+                # 基础热门查询
+                r'热门菜品',
+                r'畅销.*?(菜品|产品|添加项)',
+                r'(菜品|产品|添加项).*?排行',
+            ],
+            'store_rating': [
                 # 评分查询必须放在最前面
                 r'查询\s*(.+?)\s*评分',
                 r'(.+?)\s*评分',
@@ -190,6 +209,68 @@ class CommandParser:
             
             if store_name and store_name != '':
                 params['store_name'] = store_name
+        
+        elif command_type == 'hot_items':
+            # 提取热门菜品查询参数
+            groups = match.groups()
+            store_name = None
+            date = None
+            query_type = 'summary'  # 默认汇总
+            limit = None  # TOP N
+            days = None   # 前P天
+            
+            # 检查是否是新格式 Top N [P] [店铺] [平台] [类型]
+            if text.lower().startswith('top'):
+                # 新格式解析
+                # groups: (N, P?, 店铺?, 平台?, 类型?)
+                if groups[0]:  # N
+                    limit = int(groups[0])
+                if groups[1]:  # P天
+                    days = int(groups[1])
+                if groups[2]:  # 店铺
+                    store_name = groups[2].replace('店铺', '').replace('店', '').strip()
+                # groups[3] 是平台，已经在 _extract_platform 处理
+                if groups[4]:  # 类型
+                    type_keyword = groups[4].lower()
+                    if type_keyword in ['main', '主产品', '主菜', '菜品']:
+                        query_type = 'items'
+                    elif type_keyword in ['modifier', '添加项', '配料']:
+                        query_type = 'modifiers'
+                    elif type_keyword in ['summary', '汇总']:
+                        query_type = 'summary'
+            else:
+                # 旧格式解析（兼容）
+                for group in groups:
+                    if not group:
+                        continue
+                        
+                    # 识别类型关键词
+                    if '主产品' in group or '主菜' in group or '菜品' in group:
+                        query_type = 'items'
+                    elif '添加项' in group or '配料' in group or '加料' in group:
+                        query_type = 'modifiers'
+                    elif '汇总' in group:
+                        query_type = 'summary'
+                    # 识别日期
+                    elif re.match(r'\d{4}-\d{2}-\d{2}', group):
+                        date = group
+                    # 识别店铺名
+                    elif '店' in group:
+                        store_name = group.replace('店铺', '').replace('店', '').strip()
+                    elif group.strip() and not re.match(r'\d{4}-\d{2}-\d{2}', group):
+                        # 可能是英文店铺名或中文店铺名
+                        if not any(kw in group for kw in ['热门', '主产品', '添加项', '汇总', '菜品', '畅销', '排行']):
+                            store_name = group.strip()
+            
+            params['query_type'] = query_type
+            if limit:
+                params['limit'] = limit
+            if days:
+                params['days'] = days
+            if store_name:
+                params['store_name'] = store_name
+            if date:
+                params['date'] = date
         
         return params
     
