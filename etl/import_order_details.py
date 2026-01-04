@@ -23,63 +23,58 @@ def parse_and_insert_order(conn, raw_order_data: Dict, store_code: str = None):
     
     try:
         # 1. 插入订单主表
-        order_id = raw_order_data.get('drn_id')
-        short_drn = raw_order_data.get('short_drn')
-        order_number = raw_order_data.get('order_number')
-        restaurant_id = raw_order_data.get('restaurant_id')
+        order_id = raw_order_data.get('drn_id') or raw_order_data.get('id')
         
         # 金额信息
         amount = raw_order_data.get('amount', {})
-        total_amount = amount.get('fractional', 0) / 100.0  # 转换为实际金额
+        total_amount = amount.get('fractional', 0) / 100.0 if amount else 0.0  # 转换为实际金额
         
-        paid_in_cash = raw_order_data.get('paid_in_cash', {})
-        paid_cash_amount = paid_in_cash.get('fractional', 0) / 100.0
-        
-        currency_code = amount.get('currency_code', 'GBP')
+        currency = amount.get('currency_code', 'GBP') if amount else 'GBP'
         
         # 订单状态
-        status = raw_order_data.get('status')
-        rejection_reason = raw_order_data.get('rejection_reason')
+        status = raw_order_data.get('status', 'completed')
         
         # 时间线
         timeline = raw_order_data.get('timeline', {})
-        placed_at = timeline.get('placed_at')
-        accepted_at = timeline.get('accepted_at')
-        confirmed_at = timeline.get('confirmed_at')
-        prepare_for = timeline.get('prepare_for')
-        delivery_picked_up_at = timeline.get('delivery_picked_up_at')
+        placed_at = timeline.get('placed_at') if timeline else None
+        accepted_at = timeline.get('accepted_at') if timeline else None
+        delivered_at = timeline.get('delivery_picked_up_at') if timeline else None
         
-        # 客户信息
-        customer = raw_order_data.get('customer', {})
-        customer_id = customer.get('id')
-        
-        # 插入订单
+        # 插入订单（只使用通用字段）
         cursor.execute("""
             INSERT INTO orders (
-                order_id, platform, short_drn, order_number, restaurant_id, store_code,
-                total_amount, paid_in_cash, currency_code,
-                status, rejection_reason,
-                placed_at, accepted_at, confirmed_at, prepare_for, delivery_picked_up_at,
-                customer_id, raw_data
+                order_id, platform, store_code,
+                total_amount, currency,
+                status,
+                placed_at, accepted_at, delivered_at,
+                raw_data
             ) VALUES (
-                %s, %s, %s, %s, %s, %s,
                 %s, %s, %s,
                 %s, %s,
-                %s, %s, %s, %s, %s,
-                %s, %s
+                %s,
+                %s, %s, %s,
+                %s
             )
             ON CONFLICT (order_id, platform) DO UPDATE SET
                 status = EXCLUDED.status,
-                raw_data = EXCLUDED.raw_data,
-                delivery_picked_up_at = EXCLUDED.delivery_picked_up_at
+                total_amount = EXCLUDED.total_amount,
+                delivered_at = EXCLUDED.delivered_at,
+                raw_data = EXCLUDED.raw_data
             RETURNING id
         """, (
-            order_id, 'deliveroo', short_drn, order_number, restaurant_id, store_code,
-            total_amount, paid_cash_amount, currency_code,
-            status, rejection_reason,
-            placed_at, accepted_at, confirmed_at, prepare_for, delivery_picked_up_at,
-            customer_id, json.dumps(raw_order_data)
+            order_id, 'deliveroo', store_code,
+            total_amount, currency,
+            status,
+            placed_at, accepted_at, delivered_at,
+            json.dumps(raw_order_data)
         ))
+        
+        order_id_result = cursor.fetchone()
+        if not order_id_result:
+            print(f"⚠️  订单 {order_id[:8]} 已存在，跳过")
+            return True
+        
+        order_db_id = order_id_result[0]
         
         # 2. 插入订单菜品和添加项
         items = raw_order_data.get('items', [])
@@ -131,7 +126,7 @@ def parse_and_insert_order(conn, raw_order_data: Dict, store_code: str = None):
                 ))
         
         conn.commit()
-        print(f"✅ 订单 {order_number} ({order_id[:8]}) 导入成功")
+        print(f"✅ 订单 {order_id[:8]} 导入成功")
         return True
         
     except Exception as e:
