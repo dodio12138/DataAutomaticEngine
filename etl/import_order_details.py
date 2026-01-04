@@ -56,12 +56,7 @@ def parse_and_insert_order(conn, raw_order_data: Dict, store_code: str = None):
                 %s, %s, %s,
                 %s
             )
-            ON CONFLICT (order_id, platform) DO UPDATE SET
-                status = EXCLUDED.status,
-                total_amount = EXCLUDED.total_amount,
-                delivery_picked_up_at = EXCLUDED.delivery_picked_up_at,
-                raw_data = EXCLUDED.raw_data
-            RETURNING id
+            ON CONFLICT (order_id, platform) DO NOTHING
         """, (
             order_id, 'deliveroo', store_code, restaurant_id,
             total_amount, currency_code,
@@ -70,12 +65,10 @@ def parse_and_insert_order(conn, raw_order_data: Dict, store_code: str = None):
             json.dumps(raw_order_data)
         ))
         
-        order_id_result = cursor.fetchone()
-        if not order_id_result:
+        # 检查是否真的插入了（如果 rowcount = 0 说明已存在）
+        if cursor.rowcount == 0:
             print(f"⚠️  订单 {order_id[:8]} 已存在，跳过")
             return True
-        
-        order_db_id = order_id_result[0]
         
         # 2. 插入订单菜品和添加项
         items = raw_order_data.get('items', [])
