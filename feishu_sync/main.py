@@ -24,11 +24,27 @@ class FeishuBitableSync:
         self.app_token = os.environ.get("FEISHU_BITABLE_APP_TOKEN")  # 多维表格 app_token
         self.table_id = os.environ.get("FEISHU_BITABLE_TABLE_ID")    # 数据表 table_id
         
-        if not all([self.app_id, self.app_secret, self.app_token, self.table_id]):
-            raise ValueError("缺少飞书配置：FEISHU_APP_ID, FEISHU_APP_SECRET, FEISHU_BITABLE_APP_TOKEN, FEISHU_BITABLE_TABLE_ID")
+        # 用户 Access Token（优先使用，如果配置了的话）
+        self.user_access_token = os.environ.get("FEISHU_USER_ACCESS_TOKEN")
+        
+        # DEBUG: 打印环境变量状态
+        print(f"DEBUG - USER_ACCESS_TOKEN 配置: {'已设置' if self.user_access_token else '未设置'}")
+        if self.user_access_token:
+            print(f"DEBUG - TOKEN前缀: {self.user_access_token[:10]}...")
+        
+        if not all([self.app_token, self.table_id]):
+            raise ValueError("缺少飞书配置：FEISHU_BITABLE_APP_TOKEN, FEISHU_BITABLE_TABLE_ID")
         
         # 获取 access_token
-        self.access_token = self._get_tenant_access_token()
+        # 优先使用 user_access_token，否则使用 tenant_access_token
+        if self.user_access_token:
+            print("✅ 使用 user_access_token（用户身份）")
+            self.access_token = self.user_access_token
+        else:
+            if not all([self.app_id, self.app_secret]):
+                raise ValueError("缺少飞书配置：FEISHU_APP_ID, FEISHU_APP_SECRET")
+            print("✅ 使用 tenant_access_token（应用身份）")
+            self.access_token = self._get_tenant_access_token()
         
         # 飞书 API 基础 URL
         self.base_url = "https://open.feishu.cn/open-apis"
@@ -63,26 +79,96 @@ class FeishuBitableSync:
         """获取数据库连接"""
         return psycopg2.connect(**self.db_config, cursor_factory=RealDictCursor)
     
+    def ensure_table_fields(self):
+        """确保飞书表格中存在所有需要的字段，如果不存在则创建"""
+        required_fields = {
+            "日期": {"type": 5, "property": {}},  # 日期类型
+            "店铺代码": {"type": 1, "property": {}},  # 文本类型
+            "店铺名称": {  # 单选类型
+                "type": 3,
+                "property": {
+                    "options": [
+                        {"name": "海底捞冒菜（巴特西）"},
+                        {"name": "海底捞冒菜（Brent）"},
+                        {"name": "海底捞冒菜（东伦敦）"},
+                        {"name": "海底捞火锅（Piccadilly）"},
+                        {"name": "海底捞冒菜（Piccadilly）"},
+                        {"name": "海底捞冒菜（塔桥）"}
+                    ]
+                }
+            },
+            "平台": {  # 单选类型
+                "type": 3, 
+                "property": {
+                    "options": [
+                        {"name": "deliveroo"},
+                        {"name": "hungrypanda"}
+                    ]
+                }
+            },
+            "总销售额": {"type": 2, "property": {"formatter": "0.00"}},  # 数字类型
+            "净销售额": {"type": 2, "property": {"formatter": "0.00"}},  # 数字类型
+            "订单数": {"type": 2, "property": {"formatter": "0"}},  # 数字类型（整数）
+            "平均订单价值": {"type": 2, "property": {"formatter": "0.00"}},  # 数字类型
+        }
+        
+        # 获取现有字段
+        url = f"{self.base_url}/bitable/v1/apps/{self.app_token}/tables/{self.table_id}/fields"
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(url, headers=headers)
+        result = response.json()
+        
+        if result.get("code") != 0:
+            print(f"⚠️  获取字段列表失败: {result.get('code')} - {result.get('msg')}")
+            return
+        
+        existing_fields = {item["field_name"]: item for item in result.get("data", {}).get("items", [])}
+        print(f"📋 表格现有字段: {list(existing_fields.keys())}")
+        
+        # 创建缺失的字段
+        for field_name, field_config in required_fields.items():
+            if field_name not in existing_fields:
+                print(f"➕ 创建字段: {field_name}")
+                create_url = f"{self.base_url}/bitable/v1/apps/{self.app_token}/tables/{self.table_id}/fields"
+                data = {
+                    "field_name": field_name,
+                    "type": field_config["type"],
+                    "property": field_config["property"]
+                }
+                
+                create_response = requests.post(create_url, headers=headers, json=data)
+                create_result = create_response.json()
+                
+                if create_result.get("code") == 0:
+                    print(f"   ✅ 字段 '{field_name}' 创建成功")
+                else:
+                    print(f"   ❌ 字段 '{field_name}' 创建失败: {create_result.get('msg')}")
+        
+        print("✅ 字段检查完成\n")
+    
     def fetch_daily_summary(self, start_date: str = None, end_date: str = None, 
                            store_code: str = None, platform: str = None) -> List[Dict[str, Any]]:
         """
         从数据库获取每日销售汇总数据
         
         Args:
-            start_date: 开始日期 YYYY-MM-DD，默认7天前
-            end_date: 结束日期 YYYY-MM-DD，默认今天
+            start_date: 开始日期 YYYY-MM-DD，不传则默认为昨天（用于定时任务）
+            end_date: 结束日期 YYYY-MM-DD，不传则默认为昨天（用于定时任务）
             store_code: 店铺代码，可选
             platform: 平台，可选
         """
         conn = self.get_db_connection()
         cursor = conn.cursor()
         
-        # 默认查询最近7天
-        if not end_date:
-            end_date = date.today().strftime('%Y-%m-%d')
-        if not start_date:
-            start = date.today() - timedelta(days=7)
-            start_date = start.strftime('%Y-%m-%d')
+        # 如果都不传参数，默认获取昨天的数据（用于定时任务增量同步）
+        if start_date is None and end_date is None:
+            yesterday = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d')
+            start_date = yesterday
+            end_date = yesterday
         
         query = """
             SELECT 
@@ -97,19 +183,35 @@ class FeishuBitableSync:
                 created_at,
                 updated_at
             FROM daily_sales_summary
-            WHERE date >= %s AND date <= %s
         """
-        params = [start_date, end_date]
+        
+        where_clauses = []
+        params = []
+        
+        # 如果指定了日期范围，添加日期过滤
+        if start_date and end_date:
+            where_clauses.append("date >= %s AND date <= %s")
+            params.extend([start_date, end_date])
+        elif start_date:
+            where_clauses.append("date >= %s")
+            params.append(start_date)
+        elif end_date:
+            where_clauses.append("date <= %s")
+            params.append(end_date)
+        # 如果都不传，则查询所有数据（不添加日期过滤）
         
         if store_code:
-            query += " AND store_code = %s"
+            where_clauses.append("store_code = %s")
             params.append(store_code)
         
         if platform:
-            query += " AND platform = %s"
+            where_clauses.append("platform = %s")
             params.append(platform)
         
-        query += " ORDER BY date DESC, store_code, platform"
+        if where_clauses:
+            query += " WHERE " + " AND ".join(where_clauses)
+        
+        query += " ORDER BY date ASC, store_code, platform"  # 按日期从旧到新排序
         
         cursor.execute(query, params)
         results = cursor.fetchall()
@@ -147,7 +249,11 @@ class FeishuBitableSync:
                 break
             
             data = result.get("data", {})
-            items = data.get("items", [])
+            items = data.get("items")
+            
+            # 如果 items 为 None 或空列表，跳出循环
+            if not items:
+                break
             
             for record in items:
                 fields = record.get("fields", {})
@@ -265,12 +371,23 @@ class FeishuBitableSync:
             统计信息：{"created": 新增数, "updated": 更新数, "failed": 失败数}
         """
         print(f"=== 开始同步数据到飞书多维表格 ===")
-        print(f"时间范围: {start_date or '7天前'} ~ {end_date or '今天'}")
+        if start_date and end_date:
+            print(f"时间范围: {start_date} ~ {end_date}")
+        elif start_date:
+            print(f"时间范围: {start_date} ~ 至今")
+        elif end_date:
+            print(f"时间范围: 最早 ~ {end_date}")
+        else:
+            print(f"时间范围: 全部数据")
         if store_code:
             print(f"店铺: {store_code}")
         if platform:
             print(f"平台: {platform}")
         print()
+        
+        # 0. 确保表格字段存在
+        print("🔍 检查表格字段...")
+        self.ensure_table_fields()
         
         # 1. 获取数据库数据
         db_records = self.fetch_daily_summary(start_date, end_date, store_code, platform)

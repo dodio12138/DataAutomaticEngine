@@ -11,8 +11,8 @@ router = APIRouter(prefix="/run", tags=["feishu-sync"])
 
 
 class FeishuSyncRequest(BaseModel):
-    start_date: str | None = Field(None, description="开始日期 YYYY-MM-DD（默认7天前）")
-    end_date: str | None = Field(None, description="结束日期 YYYY-MM-DD（默认今天）")
+    start_date: str | None = Field(None, description="开始日期 YYYY-MM-DD（不传则获取全部数据）")
+    end_date: str | None = Field(None, description="结束日期 YYYY-MM-DD（不传则获取全部数据）")
     store_code: str | None = Field(None, description="店铺代码（可选）")
     platform: str | None = Field(None, description="平台：panda/deliveroo（可选）")
 
@@ -26,7 +26,7 @@ def run_feishu_sync(req: FeishuSyncRequest):
     - 从 daily_sales_summary 表读取数据
     - 同步到飞书多维表格
     - 支持增量更新（已存在则更新，不存在则创建）
-    - 默认同步最近7天的数据
+    - 默认同步全部已知数据，可指定日期范围
     """
     # 确保镜像存在
     ensure_image_exists("dataautomaticengine-feishu-sync", "../feishu_sync")
@@ -51,6 +51,16 @@ def run_feishu_sync(req: FeishuSyncRequest):
             )
         env_dict[var] = value
     
+    # 添加用户 Access Token（如果配置了）
+    user_token = os.environ.get("FEISHU_USER_ACCESS_TOKEN")
+    print(f"DEBUG API - USER_TOKEN: {'已获取' if user_token else '未获取'}")
+    if user_token:
+        print(f"DEBUG API - TOKEN前缀: {user_token[:10]}...")
+        env_dict["FEISHU_USER_ACCESS_TOKEN"] = user_token
+        print(f"DEBUG API - 已添加到env_dict")
+    else:
+        print("DEBUG API - user_token为空，将使用tenant_access_token")
+    
     # 生成时间戳用于日志文件名和容器名
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     log_file = os.path.join(LOG_DIR, f"feishu_sync_{timestamp}.log")
@@ -68,7 +78,7 @@ def run_feishu_sync(req: FeishuSyncRequest):
         command.extend(["--platform", req.platform])
     
     try:
-        # 创建临时容器（连接到 docker compose 网络）
+        # 创建临时容器（连接到 docker compose 网络）- 不自动删除
         container = client.containers.run(
             image="dataautomaticengine-feishu-sync",
             name=container_name,
@@ -80,7 +90,7 @@ def run_feishu_sync(req: FeishuSyncRequest):
                 "com.docker.compose.service": "feishu-sync-temp"
             },
             command=command,
-            remove=True,
+            remove=False,  # 先不删除，获取日志后再删除
             detach=True
         )
         
@@ -90,6 +100,12 @@ def run_feishu_sync(req: FeishuSyncRequest):
         
         # 获取日志
         logs = container.logs(stdout=True, stderr=True).decode('utf-8', errors='ignore')
+        
+        # 删除容器
+        try:
+            container.remove()
+        except:
+            pass  # 删除失败不影响结果
         
         # 保存日志到文件
         with open(log_file, 'w', encoding='utf-8') as f:

@@ -1,7 +1,7 @@
 #!/bin/bash
 # 飞书多维表格同步便捷脚本
 # 用法:
-#   ./sync_feishu_bitable.sh                           # 同步最近7天
+#   ./sync_feishu_bitable.sh                           # 同步全部数据
 #   ./sync_feishu_bitable.sh 2025-12-24                # 同步指定日期
 #   ./sync_feishu_bitable.sh 2025-12-20 2025-12-25     # 同步日期范围
 
@@ -32,26 +32,26 @@ ${YELLOW}用法：${NC}
   $0 [起始日期] [结束日期]
 
 ${YELLOW}参数说明：${NC}
-  起始日期      YYYY-MM-DD 格式（可选，默认7天前）
-  结束日期      YYYY-MM-DD 格式（可选，默认今天）
+  起始日期      YYYY-MM-DD 格式（可选，不传则同步全部数据）
+  结束日期      YYYY-MM-DD 格式（可选，不传则同步全部数据）
 
 ${YELLOW}示例：${NC}
-  ${GREEN}# 同步最近7天${NC}
+  ${GREEN}# 同步全部数据${NC}
   $0
 
   ${GREEN}# 同步昨天${NC}
-  $0 \$(date -v-1d +%Y-%m-%d)
+  $0 \$(date -v-1d +%Y-%m-%d) \$(date -v-1d +%Y-%m-%d)
 
   ${GREEN}# 同步指定日期${NC}
-  $0 2025-12-24
+  $0 2025-12-24 2025-12-24
 
   ${GREEN}# 同步日期范围${NC}
   $0 2025-12-20 2025-12-25
 
 ${YELLOW}环境变量：${NC}
   需要在 .env 文件中配置以下变量：
-  - FEISHU_APP_ID
-  - FEISHU_APP_SECRET
+  - FEISHU_APP_ID / FEISHU_APP_SECRET（如果使用应用身份）
+  - FEISHU_USER_ACCESS_TOKEN（如果使用用户身份）
   - FEISHU_BITABLE_APP_TOKEN
   - FEISHU_BITABLE_TABLE_ID
 
@@ -89,11 +89,12 @@ if [ -n "$START_DATE" ] && [ -n "$END_DATE" ]; then
     JSON_DATA="{\"start_date\":\"$START_DATE\",\"end_date\":\"$END_DATE\"}"
     echo -e "${BLUE}同步日期范围: $START_DATE ~ $END_DATE${NC}\n"
 elif [ -n "$START_DATE" ]; then
-    JSON_DATA="{\"start_date\":\"$START_DATE\",\"end_date\":\"$START_DATE\"}"
-    echo -e "${BLUE}同步日期: $START_DATE${NC}\n"
+    JSON_DATA="{\"start_date\":\"$START_DATE\"}"
+    echo -e "${BLUE}同步从 $START_DATE 至今的数据${NC}\n"
 else
-    JSON_DATA="{}"
-    echo -e "${BLUE}同步最近7天数据${NC}\n"
+    # 默认获取所有数据：传递一个很早的开始日期
+    JSON_DATA="{\"start_date\":\"2020-01-01\"}"
+    echo -e "${BLUE}同步全部数据（从 2020-01-01 至今）${NC}\n"
 fi
 
 # 发送请求
