@@ -82,7 +82,8 @@ def run_feishu_sync(req: FeishuSyncRequest):
         print(f"📝 命令: {' '.join(command)}")
         print(f"🔑 环境变量数量: {len(env_dict)}")
         
-        # 创建临时容器（连接到 docker compose 网络）- 不自动删除
+        # 创建临时容器（连接到 docker compose 网络）
+        # 注意：使用 stream=True 实时获取日志，避免 remove=True 导致的日志丢失
         container = client.containers.run(
             image="dataautomaticengine-feishu-sync",
             name=container_name,
@@ -94,58 +95,57 @@ def run_feishu_sync(req: FeishuSyncRequest):
                 "com.docker.compose.service": "feishu-sync-temp"
             },
             command=command,
-            remove=False,  # 先不删除，获取日志后再删除
-            detach=True
+            remove=False,  # 先不删除，等获取日志后再删除
+            detach=True    # 后台运行
         )
         
         print(f"⏳ 等待容器执行完成...")
         
-        # 等待容器执行完成（设置超时）
-        result = container.wait(timeout=300)  # 5分钟超时
-        exit_code = result['StatusCode']
+        # 等待容器执行完成
+        result = container.wait()
+        exit_code = result.get('StatusCode', result) if isinstance(result, dict) else result
         
         print(f"✅ 容器执行完成，退出码: {exit_code}")
         
-        # 获取日志
-        logs = container.logs(stdout=True, stderr=True).decode('utf-8', errors='ignore')
+        # 获取完整日志（在容器被删除前）
+        logs = container.logs(stdout=True, stderr=True).decode('utf-8', errors='replace')
         
         # 删除容器
         try:
             container.remove()
-        except:
-            pass  # 删除失败不影响结果
+            print(f"🗑️  容器已删除")
+        except Exception as e:
+            print(f"⚠️  删除容器失败: {e}")
+        
+        # 实时打印日志到控制台
+        print(f"\n{'='*60}")
+        print(f"[容器: {container_name}] 飞书同步日志")
+        print(f"{'='*60}")
+        print(logs)
+        print(f"{'='*60}\n")
         
         # 保存日志到文件
         with open(log_file, 'w', encoding='utf-8') as f:
+            f.write(f"=== Feishu Sync Log ===\n")
+            f.write(f"Timestamp: {timestamp}\n")
+            f.write(f"Parameters: start_date={req.start_date}, end_date={req.end_date}, store_code={req.store_code}, platform={req.platform}\n")
+            f.write(f"Exit Code: {exit_code}\n")
+            f.write(f"=======================\n\n")
             f.write(logs)
         
-        # 打印日志到控制台
-        print("=== 飞书同步日志 ===")
-        print(logs)
-        print("======================")
-        
-        if exit_code == 0:
-            return {
-                "status": "success",
-                "message": "飞书同步完成",
-                "log_file": log_file,
-                "container_name": container_name,
-                "exit_code": exit_code
-            }
-        else:
-            return {
-                "status": "failed",
-                "message": f"飞书同步失败，退出码：{exit_code}",
-                "log_file": log_file,
-                "container_name": container_name,
-                "exit_code": exit_code,
-                "logs": logs[-1000:] if len(logs) > 1000 else logs  # 返回最后1000字符的日志
-            }
+        return {
+            "status": "success" if exit_code == 0 else "failed",
+            "message": "飞书同步完成" if exit_code == 0 else f"飞书同步失败，退出码：{exit_code}",
+            "container_name": container_name,
+            "exit_code": exit_code,
+            "output": logs,
+            "log_file": log_file,
+        }
     
     except APIError as e:
         error_msg = f"Docker 容器创建失败: {str(e)}"
         print(f"❌ {error_msg}")
-        raise HTTPException(status_code=500, detail=error_msg)
+        raise HTTPException(status_code=502, detail=error_msg)
     except Exception as e:
         error_msg = f"未知错误: {type(e).__name__} - {str(e)}"
         print(f"❌ {error_msg}")
