@@ -41,92 +41,88 @@ cat > "$SQL_FILE" << 'EOF'
 -- =========================================
 
 -- 1. 订单表（解析自 raw_orders.payload）
+-- 注意：与导入脚本 etl/import_order_details.py 保持一致
 CREATE TABLE IF NOT EXISTS orders (
-    order_id VARCHAR(128) PRIMARY KEY,           -- 订单唯一ID
-    platform VARCHAR(32) NOT NULL,                -- 平台（deliveroo/hungrypanda）
-    store_code VARCHAR(64) NOT NULL,              -- 店铺代码
-    store_name VARCHAR(128),                      -- 店铺名称
-    
-    -- 订单状态
-    status VARCHAR(32),                           -- 订单状态
-    currency VARCHAR(8),                          -- 货币类型
+    id SERIAL PRIMARY KEY,                        -- 自增主键
+    order_id VARCHAR(100) NOT NULL,               -- 订单唯一ID（字符串）
+    short_drn VARCHAR(50),                        -- Deliveroo 短订单号
+    order_number VARCHAR(50),                     -- 订单号
+    restaurant_id VARCHAR(50) NOT NULL,           -- 餐厅ID
+    store_code VARCHAR(50),                       -- 店铺代码
+    platform VARCHAR(20) DEFAULT 'deliveroo',     -- 平台（deliveroo/hungrypanda）
     
     -- 金额信息
-    subtotal_amount NUMERIC(10,2),                -- 小计金额
-    discount_amount NUMERIC(10,2),                -- 折扣金额
     total_amount NUMERIC(10,2),                   -- 总金额
-    tip_amount NUMERIC(10,2),                     -- 小费
-    delivery_fee NUMERIC(10,2),                   -- 配送费
-    service_fee NUMERIC(10,2),                    -- 服务费
+    paid_in_cash NUMERIC(10,2),                   -- 现金支付金额
+    currency_code VARCHAR(10) DEFAULT 'GBP',      -- 货币类型
+    
+    -- 订单状态
+    status VARCHAR(50),                           -- 订单状态
+    rejection_reason TEXT,                        -- 拒单原因
     
     -- 时间信息
     placed_at TIMESTAMP,                          -- 下单时间
     accepted_at TIMESTAMP,                        -- 接单时间
-    ready_at TIMESTAMP,                           -- 准备完成时间
-    delivered_at TIMESTAMP,                       -- 送达时间
+    confirmed_at TIMESTAMP,                       -- 确认时间
+    prepare_for TIMESTAMP,                        -- 准备时间
+    delivery_picked_up_at TIMESTAMP,              -- 配送员取餐时间
     
-    -- 其他信息
-    customer_note TEXT,                           -- 顾客备注
-    restaurant_note TEXT,                         -- 餐厅备注
-    delivery_type VARCHAR(32),                    -- 配送类型
+    -- 客户信息
+    customer_id INTEGER,                          -- 客户ID
     
     -- 原始数据
     raw_data JSONB,                               -- 完整的 JSON 数据（备份）
     
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 订单表唯一约束（防止重复导入）
+CREATE UNIQUE INDEX IF NOT EXISTS unique_deliveroo_order ON orders(order_id, platform);
+
 -- 订单表索引
-CREATE INDEX IF NOT EXISTS idx_orders_platform ON orders(platform);
-CREATE INDEX IF NOT EXISTS idx_orders_store ON orders(store_code);
+CREATE INDEX IF NOT EXISTS idx_orders_store_code ON orders(store_code);
+CREATE INDEX IF NOT EXISTS idx_orders_restaurant_id ON orders(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_placed_at ON orders(placed_at);
-CREATE INDEX IF NOT EXISTS idx_orders_store_date ON orders(store_code, DATE(placed_at));
-CREATE INDEX IF NOT EXISTS idx_orders_platform_date ON orders(platform, DATE(placed_at));
 
 -- 2. 订单项表（订单中的菜品）
 CREATE TABLE IF NOT EXISTS order_items (
     id SERIAL PRIMARY KEY,
-    order_id VARCHAR(128) NOT NULL,               -- 关联订单ID
+    order_id VARCHAR(100) NOT NULL,               -- 关联订单ID（字符串，不是外键）
     
-    item_name VARCHAR(512) NOT NULL,              -- 菜品名称
-    category_name VARCHAR(128),                   -- 分类名称
+    item_name VARCHAR(500) NOT NULL,              -- 菜品名称
+    category_name VARCHAR(255),                   -- 分类名称
     
-    quantity INTEGER NOT NULL,                    -- 数量
+    quantity INTEGER DEFAULT 1,                   -- 数量
     unit_price NUMERIC(10,2),                     -- 单价
     total_price NUMERIC(10,2),                    -- 总价
     total_unit_price NUMERIC(10,2),               -- 单品总价（含添加项）
     
-    item_data JSONB,                              -- 完整的菜品数据
-    
-    created_at TIMESTAMP DEFAULT NOW(),
-    
-    FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 订单项索引
-CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
-CREATE INDEX IF NOT EXISTS idx_order_items_name ON order_items(item_name);
-CREATE INDEX IF NOT EXISTS idx_order_items_category ON order_items(category_name);
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_items_item_name ON order_items(item_name);
+CREATE INDEX IF NOT EXISTS idx_order_items_category_name ON order_items(category_name);
 
 -- 3. 订单项添加项表（菜品的配料、调料等）
 CREATE TABLE IF NOT EXISTS order_item_modifiers (
     id SERIAL PRIMARY KEY,
-    order_item_id INTEGER NOT NULL,               -- 关联订单项ID
-    order_id VARCHAR(128) NOT NULL,               -- 关联订单ID（冗余，便于查询）
+    order_item_id INTEGER NOT NULL,               -- 关联订单项ID（外键）
+    order_id VARCHAR(100) NOT NULL,               -- 关联订单ID（冗余，便于查询）
     
-    modifier_name VARCHAR(256) NOT NULL,          -- 添加项名称
+    modifier_name VARCHAR(500) NOT NULL,          -- 添加项名称
     
-    created_at TIMESTAMP DEFAULT NOW(),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE CASCADE,
-    FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE
+    FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE CASCADE
 );
 
 -- 添加项索引
-CREATE INDEX IF NOT EXISTS idx_modifiers_order_item ON order_item_modifiers(order_item_id);
-CREATE INDEX IF NOT EXISTS idx_modifiers_order ON order_item_modifiers(order_id);
-CREATE INDEX IF NOT EXISTS idx_modifiers_name ON order_item_modifiers(modifier_name);
+CREATE INDEX IF NOT EXISTS idx_order_item_modifiers_order_item_id ON order_item_modifiers(order_item_id);
+CREATE INDEX IF NOT EXISTS idx_order_item_modifiers_order_id ON order_item_modifiers(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_item_modifiers_modifier_name ON order_item_modifiers(modifier_name);
 
 -- =========================================
 -- 统计视图（6个分析视图）
