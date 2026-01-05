@@ -12,6 +12,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import requests
 import json
+from token_manager import FeishuTokenManager
 
 
 class FeishuBitableSync:
@@ -20,32 +21,15 @@ class FeishuBitableSync:
     def __init__(self):
         try:
             # 飞书应用配置
-            self.app_id = os.environ.get("FEISHU_APP_ID")
-            self.app_secret = os.environ.get("FEISHU_APP_SECRET")
             self.app_token = os.environ.get("FEISHU_BITABLE_APP_TOKEN")  # 多维表格 app_token
             self.table_id = os.environ.get("FEISHU_BITABLE_TABLE_ID")    # 数据表 table_id
-            
-            # 用户 Access Token（优先使用，如果配置了的话）
-            self.user_access_token = os.environ.get("FEISHU_USER_ACCESS_TOKEN")
-            
-            # DEBUG: 打印环境变量状态
-            print(f"DEBUG - USER_ACCESS_TOKEN 配置: {'已设置' if self.user_access_token else '未设置'}")
-            if self.user_access_token:
-                print(f"DEBUG - TOKEN前缀: {self.user_access_token[:10]}...")
             
             if not all([self.app_token, self.table_id]):
                 raise ValueError("缺少飞书配置：FEISHU_BITABLE_APP_TOKEN, FEISHU_BITABLE_TABLE_ID")
             
-            # 获取 access_token
-            # 优先使用 user_access_token，否则使用 tenant_access_token
-            if self.user_access_token:
-                print("✅ 使用 user_access_token（用户身份）")
-                self.access_token = self.user_access_token
-            else:
-                if not all([self.app_id, self.app_secret]):
-                    raise ValueError("缺少飞书配置：FEISHU_APP_ID, FEISHU_APP_SECRET")
-                print("✅ 使用 tenant_access_token（应用身份）")
-                self.access_token = self._get_tenant_access_token()
+            # 使用 TokenManager 自动管理 token（支持自动刷新）
+            self.token_manager = FeishuTokenManager()
+            self.access_token = self.token_manager.get_access_token()
             
             # 飞书 API 基础 URL
             self.base_url = "https://open.feishu.cn/open-apis"
@@ -63,23 +47,6 @@ class FeishuBitableSync:
             "user": os.environ.get("DB_USER", "delivery_user"),
             "password": os.environ.get("DB_PASSWORD", "delivery_pass"),
         }
-    
-    def _get_tenant_access_token(self) -> str:
-        """获取tenant_access_token"""
-        url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
-        headers = {"Content-Type": "application/json"}
-        data = {
-            "app_id": self.app_id,
-            "app_secret": self.app_secret
-        }
-        
-        response = requests.post(url, headers=headers, json=data)
-        result = response.json()
-        
-        if result.get("code") != 0:
-            raise Exception(f"获取access_token失败: {result}")
-        
-        return result["tenant_access_token"]
     
     def get_db_connection(self):
         """获取数据库连接"""

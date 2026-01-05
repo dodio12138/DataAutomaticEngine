@@ -8,24 +8,34 @@
 ## Architecture & Core Components
 
 ### Service Layer (Docker Containers)
-- **API (FastAPI)** - 控制层，暴露 `/run/crawler`、`/run/deliveroo/daily-summary`、`/run/panda/daily-summary`、`/run/feishu-sync` 端点；支持Feishu机器人集成（Webhook + Long Connection）
-- **Crawler (Selenium)** - 爬虫层，分为两类任务：
+- **API (FastAPI)** - 控制层，暴露 `/run/crawler`、`/run/deliveroo/daily-summary`、`/run/panda/daily-summary`、`/run/feishu-sync`、`/run/store-ratings`、`/run/import-order-details` 端点；支持Feishu机器人集成（Webhook + Long Connection）
+- **Crawler (Selenium)** - 爬虫层，分为三类任务：
   - **订单爬取（`main.py`）**: 使用 Selenium 从 HungryPanda/Deliveroo 抓取订单详情，存入 `raw_orders` 表
   - **日汇总爬取（`run_daily_summary.py`）**: 直接从 Deliveroo Summary API 批量拉取日汇总数据，存入 `daily_sales_summary` 表
-- **ETL** - 数据处理层，从 `raw_orders` 解析 HungryPanda 订单 JSON，计算日汇总并入库 `daily_sales_summary` 表
-- **Feishu Sync** - 飞书同步层，将 `daily_sales_summary` 数据同步到飞书多维表格，支持增量更新
+  - **评分爬取（`run_store_ratings.py`）**: 从 Deliveroo 抓取店铺评分数据，存入 `store_ratings` 表
+- **ETL** - 数据处理层，两类任务：
+  - HungryPanda 日汇总计算：从 `raw_orders` 解析 JSON 并入库 `daily_sales_summary` 表
+  - Deliveroo 订单详情解析：从 `raw_orders` 解析 JSON 到 `orders/order_items/order_item_modifiers` 详细表结构
+- **Feishu Sync** - 飞书同步层，将 `daily_sales_summary` 数据同步到飞书多维表格，支持增量更新和自动 token 刷新
 - **Scheduler (cron)** - 定时调度层，运行 crontab 任务周期性触发爬虫/汇总计算/飞书同步（见 [scheduler/scheduler.cron](scheduler/scheduler.cron)）
 - **Database (PostgreSQL)** - 数据持久化层，所有服务共享
 
 ### Data Layer (PostgreSQL)
-核心表结构见 [db/init.sql](db/init.sql)：
+核心表结构见 [db/init.sql](db/init.sql) 和 [db/migrations/](db/migrations/)：
 - `stores` - 店铺元数据与平台映射（平台英文代码、店铺ID、登录凭证）
-- `raw_orders` - 原始订单JSON（platform, store_code, order_id, payload，仅 HungryPanda）
-- `daily_sales_summary` - **核心汇总表**，存储每店铺每日销售数据（gross_sales, net_sales, order_count）：
-  - HungryPanda: 由 ETL 从 `raw_orders` 计算生成（`/run/panda/daily-summary`）
-  - Deliveroo: 由爬虫直接从 Summary API 拉取并入库（`/run/deliveroo/daily-summary`）
+- `raw_orders` - 原始订单JSON（platform, store_code, order_id, payload）
+- `daily_sales_summary` - **核心汇总表**，存储每店铺每日销售数据（gross_sales, net_sales, order_count）
+- `store_ratings` - 店铺评分表，存储 Deliveroo 评分数据（average_rating, rating_count, 星级分布）
+- **订单详情表系列**（仅 Deliveroo）：
+  - `orders` - 订单主表（order_id, total_amount, status, 时间线）
+  - `order_items` - 菜品表（item_name, quantity, price）
+  - `order_item_modifiers` - 添加项表（modifier_name）
+  - `v_item_sales_stats` - 菜品销量统计视图
+  - `v_modifier_usage_stats` - 添加项使用统计视图
 
-**关键区别：** HungryPanda 需要"爬订单→计算汇总"两阶段，Deliveroo 可直接获取汇总数据。
+**关键区别：** 
+- HungryPanda: 需要"爬订单→计算汇总"两阶段
+- Deliveroo: 可直接获取汇总数据，但订单详情需从 `raw_orders` 解析到详细表
 
 ## Critical Developer Workflows
 
@@ -60,20 +70,34 @@
      -d '{"start_date":"2025-12-24","end_date":"2025-12-24"}'
    ```
 
-3. **使用便捷脚本（推荐）：**
+3. **使用便捷脚本（推荐，根目录26+个shell工具）：**
    ```bash
-   # 补爬订单（支持日期范围、多平台）
-   ./manual_crawl.sh 2025-12-24  # 爬取当天所有店铺
+   # === 爬虫相关 ===
+   ./manual_crawl.sh 2025-12-24  # 爬取订单（当天所有店铺）
    ./manual_crawl.sh --platform hungrypanda 2025-12-20 2025-12-25  # 5天范围
+   ./manual_deliveroo_summary.sh 2025-12-24  # 补爬 Deliveroo 日汇总
+   ./manual_panda_summary.sh 2025-12-24  # 计算 HungryPanda 日汇总
+   ./manual_ratings.sh 2025-12-24  # 爬取店铺评分
    
+   # === 订单详情处理 ===
+   ./import_orders.sh  # 导入订单详情（raw_orders → orders/order_items/modifiers）
+   ./setup_order_details_tables.sh  # 初始化订单详情表结构
    
-   # 同步到飞书多维表格
-   ./sync_feishu_bitable.sh 2025-12-24
-   # 补爬 Deliveroo 日汇总
-   ./manual_deliveroo_summary.sh 2025-12-24
+   # === 飞书同步 ===
+   ./sync_feishu_bitable.sh 2025-12-24  # 同步到飞书多维表格
+   ./diagnose_feishu_sync.sh  # 诊断飞书同步问题
    
-   # 计算 HungryPanda 日汇总
-   ./manual_panda_summary.sh 2025-12-24
+   # === 数据库调试 ===
+   ./db_shell.sh  # 进入 psql 交互式终端
+   ./db_view_daily_summary.sh  # 快速查看汇总数据
+   ./db_view_orders.sh  # 查看订单详情表
+   ./db_view_ratings.sh  # 查看评分数据
+   ./db_stats.sh  # 查看数据统计
+   ./quick_stats.sh  # 快速概览（订单数/金额等）
+   
+   # === 构建部署 ===
+   ./build_and_start.sh  # 构建镜像并启动
+   ./clean_rebuild.sh  # 清理并重新构建
    ```
 
 4. **监控日志：**
@@ -86,8 +110,22 @@
    ./db_shell.sh  # 进入 psql 交互式终端
    ./db_view_daily_summary.sh  # 快速查看汇总数据
    ./db_view_raw.sh  # 查看原始订单
+   ./db_view_orders.sh  # 查看订单详情表（Deliveroo）
+   ./db_view_order_stats.sh  # 菜品销量统计
+   ./db_view_ratings.sh  # 评分数据
    ./db_stats.sh  # 查看数据统计
+   ./show_all_tables.sh  # 列出所有表结构
    ```
+
+### Critical Data Migration Pattern
+数据库迁移文件存放在 `db/migrations/`，按时间顺序命名：
+- 文件命名：`YYYYMMDD_description.sql`（如 `20260101_add_order_details_tables.sql`）
+- 执行方式：PostgreSQL 容器启动时自动执行（见 docker-compose.yaml 挂载）
+- **重要：** 新增字段/表时需创建迁移文件，不要直接修改 `init.sql`
+
+**关键迁移示例：**
+- [20251230_add_store_ratings.sql](db/migrations/20251230_add_store_ratings.sql) - 店铺评分表
+- [20260101_add_order_details_tables.sql](db/migrations/20260101_add_order_details_tables.sql) - 订单详情表系列
 
 ### Docker Network Communication
 - API、Crawler、ETL 通过 `dataautomaticengine_default` 网络通信
@@ -167,21 +205,51 @@ cd api && ./test_feishu_bot.sh
 ### 7. Scheduler Automation Pattern
 定时任务见 [scheduler/scheduler.cron](scheduler/scheduler.cron)，关键执行时间：
 - **4:00 AM** - HungryPanda 订单爬取（`/run/crawler?platform=panda`）
+- **5:00 AM** - Deliveroo 订单爬取（`/run/crawler?platform=deliveroo`）
+- **5:30 AM** - Deliveroo 订单详情导入（`/run/import-order-details?days=1`）
+- **6:00 AM** - Deliveroo 日汇总爬取（`/run/deliveroo/daily-summary`）
+- **6:30 AM** - HungryPanda 日汇总计算（`/run/panda/daily-summary`）
+- **7:00 AM** - 店铺评分爬取（`/run/store-ratings`）
 - **7:30 AM** - 飞书多维表格同步（`/run/feishu-sync`）
 - **9:00 AM** - 飞书推送昨日汇总（`/reminder/daily-summary`）
 
-**关键原则：** 任务间有时间间隔，确保数据依赖完成（如订单爬取 → 汇总计算 → 飞书同步）。
+**关键原则：** 任务间有时间间隔，确保数据依赖完成（如订单爬取 → 订单详情导入 → 汇总计算 → 飞书同步）。
 
-### 8. Feishu Bitable Integration
+### 8. Feishu Bot Integration (Intelligent Query & Command Pattern)
+飞书机器人支持智能查询（见 [api/services/feishu_bot/](api/services/feishu_bot/)）：
+- **架构设计**：command_parser → message_handler → responder（三层分离）
+- **命令解析器**：使用正则表达式模式匹配，支持灵活的自然语言输入
+- **支持的查询类型**：
+  - 日汇总查询：`查询 Battersea 2025-12-24` 或 `2025-12-20至2025-12-24`
+  - 热门菜品：`Top 10 Battersea deliveroo main`（新格式）或 `热门主产品`（旧格式）
+  - 店铺评分：`Battersea 评分` 或 `查询 Battersea 评分`
+  - 帮助信息：`帮助` 或 `?`
+
+**完整功能见：**
+- [HOT_ITEMS_GUIDE.md](HOT_ITEMS_GUIDE.md) - 热门菜品查询详细说明
+- [TOP_N_FORMAT_GUIDE.md](TOP_N_FORMAT_GUIDE.md) - Top N 格式规范
+- [api/services/feishu_bot/QUICKSTART.md](api/services/feishu_bot/QUICKSTART.md) - 快速集成指南
+
+测试命令：
+```bash
+cd api && ./test_feishu_bot.sh
+# 或手动测试：curl -X POST "http://localhost:8000/feishu/bot/test?text=Top 10 Battersea"
+```
+
+### 9. Feishu Bitable Sync (Application Permission)
 飞书多维表格同步服务（见 [feishu_sync/](feishu_sync/)）：
 - **功能**：将 `daily_sales_summary` 数据同步到飞书多维表格
 - **同步逻辑**：使用 `日期_店铺代码_平台` 作为唯一键，已存在则更新，不存在则创建
+- **Token 管理**（关键特性）：
+  - 使用应用权限：`FeishuTokenManager` 自动管理 tenant_access_token
+  - 自动缓存和刷新，提前 5 分钟刷新过期 token
+  - 需要在飞书开放平台申请多维表格相关权限
 - **环境变量**：需配置 `FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_BITABLE_APP_TOKEN`、`FEISHU_BITABLE_TABLE_ID`
 - **表格字段**：日期（日期类型）、店铺代码、店铺名称、平台、总销售额、净销售额、订单数、平均订单价值
-- **测试命令**：`./sync_feishu_bitable.sh 2025-12-24`nda/daily-summary`）
-- **9:00 AM** - 飞书推送昨日汇总（`/reminder/daily-summary`）
+- **测试命令**：`./sync_feishu_bitable.sh 2025-12-24`
 
-**关键原则：** 任务间有时间间隔，确保数据依赖完成（如订单爬取 → 汇总计算）。
+**完整指南见：**
+- [FEISHU_SYNC_TROUBLESHOOTING.md](FEISHU_SYNC_TROUBLESHOOTING.md) - 常见问题排查
 
 ## Integration Points & External Dependencies
 
@@ -190,37 +258,55 @@ cd api && ./test_feishu_bot.sh
 - **Deliveroo 平台：** 
   - 订单爬取：`crawler/services/deliveroo/fetch_orders.py`（Selenium）
   - 日汇总爬取：`crawler/services/deliveroo/daily_summary.py`（直接 Summary API）
-- **Feishu 群机器人：** 
-  - 接收消息：Webhook 回调（Feishu → API）
-  - 发送消息：HTTP POST 到飞书 API 端点
+  - 评分爬取：`crawler/run_store_ratings.py`（Selenium 从 Ratings API）
+- **Feishu 集成：** 
+  - 群机器人（Webhook）：接收消息并智能解析查询命令
+  - 长链接服务（WebSocket）：主动推送通知
+  - 多维表格同步：定时将数据同步到飞书多维表格
   - 完整集成见 [api/services/feishu_bot/QUICKSTART.md](api/services/feishu_bot/QUICKSTART.md)
 
 ### Database Schema Dependencies
 新增订单字段时需同步更新：
-1. `raw_orders.payload` JSONB 结构（爬虫存入，仅 HungryPanda）
+1. `raw_orders.payload` JSONB 结构（爬虫存入）
 2. `daily_sales_summary` 表字段（两平台共享）
-3. ETL 解析逻辑（`etl/panda_daily_summary.py` 等）
+3. ETL 解析逻辑（`etl/panda_daily_summary.py`、`etl/import_order_details.py` 等）
+4. 订单详情表（仅 Deliveroo）：`orders`、`order_items`、`order_item_modifiers` 及相关视图
 
-**注意：** Deliveroo 订单数据不存储到 `raw_orders`（直接获取汇总），仅 HungryPanda 使用原始订单表。
+**数据流关系：**
+- HungryPanda: `raw_orders` → ETL计算 → `daily_sales_summary`
+- Deliveroo 汇总: Summary API → `daily_sales_summary`（直接入库）
+- Deliveroo 详情: `raw_orders` → ETL解析 → `orders/order_items/order_item_modifiers`（详细表）
 
-##Feishu Bot（群机器人推送）
-FEISHU_BOT_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+## Environment Configuration
 
-# Feishu App（多维表格同步）
-FEISHU_APP_ID=cli_xxxxxxxxxxxxx
-FEISHU_APP_SECRET=xxxxxxxxxxxxxxxxxxxxx
-FEISHU_BITABLE_APP_TOKEN=bascnxxxxxxxxxxxxx   # 多维表格 app_token
-FEISHU_BITABLE_TABLE_ID=tblxxxxxxxxxxxxx      # 数据表 table_id
-# .env
-DB_HOST=db                      # Docker 容器内访问
+### Required Environment Variables
+```bash
+# Database (Docker 容器内访问)
+DB_HOST=db
 DB_PORT=5432
 DB_NAME=delivery_data
 DB_USER=delivery_user
 DB_PASSWORD=delivery_pass
 
-# Optional: Feishu Bot Token
+# Feishu Bot（群机器人推送）
 FEISHU_BOT_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+
+# Feishu App（多维表格同步 - 应用权限）
+FEISHU_APP_ID=cli_xxxxxxxxxxxxx
+FEISHU_APP_SECRET=xxxxxxxxxxxxxxxxxxxxx
+FEISHU_BITABLE_APP_TOKEN=bascnxxxxxxxxxxxxx   # 多维表格 app_token
+FEISHU_BITABLE_TABLE_ID=tblxxxxxxxxxxxxx      # 数据表 table_id
+
+# 店铺登录凭证（存储在 .env 或 stores 表）
+# 见 crawler/store_config.py 中的配置示例
 ```
+
+**飞书权限配置：**
+1. 访问飞书开放平台：https://open.feishu.cn
+2. 选择你的应用 → **权限管理**
+3. 申请以下权限：
+   - `bitable:app` - 读写多维表格
+4. 提交审核并等待通过
 
 ## Code Style & Conventions
 

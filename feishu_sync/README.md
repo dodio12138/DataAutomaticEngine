@@ -3,23 +3,36 @@
 ## 功能说明
 从 `daily_sales_summary` 表自动同步数据到飞书多维表格，支持增量更新。
 
+## 权限模式
+✨ **使用应用权限（tenant_access_token）**，自动刷新，无需用户授权。
+
 ## 环境变量配置
 
 需要在 `.env` 文件中添加以下配置：
 
 ```bash
-# 飞书应用配置
+# 飞书应用配置（必需）
 FEISHU_APP_ID=cli_xxxxxxxxxxxxx
 FEISHU_APP_SECRET=xxxxxxxxxxxxxxxxxxxxx
 
-# 飞书多维表格配置
+# 飞书多维表格配置（必需）
 FEISHU_BITABLE_APP_TOKEN=bascnxxxxxxxxxxxxx   # 多维表格的 app_token
 FEISHU_BITABLE_TABLE_ID=tblxxxxxxxxxxxxx      # 数据表的 table_id
 ```
 
+## 飞书开放平台权限配置
+
+**重要：需要在飞书开放平台申请以下权限**
+
+1. 访问 https://open.feishu.cn
+2. 选择你的应用 → **权限管理**
+3. 申请权限：
+   - `bitable:app` - 获取、查询、更新多维表格
+4. 提交审核并等待通过
+
 ## 飞书多维表格字段配置
 
-在飞书多维表格中需要创建以下字段：
+在飞书多维表格中需要创建以下字段（或由脚本自动创建）：
 
 | 字段名称 | 字段类型 | 说明 |
 |---------|---------|------|
