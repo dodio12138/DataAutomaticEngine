@@ -38,5 +38,5 @@
 # ============================================
 
 # 每天早上7点30分同步昨天的数据到飞书多维表格（不传参数，API 默认为昨天）
-11 9 * * * /bin/bash -c 'sleep 60 && curl -s -X POST http://api:8000/run/feishu-sync -H "Content-Type: application/json" -d '"'"'{}'"'"' >> /var/log/cron-feishu-sync.log 2>&1'
+25 9 * * * /bin/bash -c 'sleep 60 && curl -s -X POST http://api:8000/run/feishu-sync -H "Content-Type: application/json" -d '"'"'{}'"'"' >> /var/log/cron-feishu-sync.log 2>&1'
 
