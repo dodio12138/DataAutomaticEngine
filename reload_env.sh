@@ -32,21 +32,24 @@ grep "^FEISHU_" .env | head -10 | sed 's/=.*/=***/' || echo "  未找到飞书�
 if [ -n "$1" ]; then
     SERVICES="$1"
     echo ""
-    echo "2️⃣ 重启指定服务: $SERVICES"
+    echo "2️⃣ 重新创建指定服务: $SERVICES"
 else
     SERVICES="api scheduler"
     echo ""
-    echo "2️⃣ 重启所有依赖环境变量的服务..."
+    echo "2️⃣ 重新创建所有依赖环境变量的服务..."
 fi
 
 echo "------------------------------------"
+echo "⚠️  使用 docker compose up -d 强制重新读取 .env 文件"
+echo ""
+
 for service in $SERVICES; do
-    echo "🔄 重启 $service 容器..."
-    docker compose restart $service
+    echo "🔄 重新创建 $service 容器..."
+    docker compose up -d --force-recreate --no-deps $service
     if [ $? -eq 0 ]; then
-        echo "✅ $service 重启成功"
+        echo "✅ $service 重新创建成功"
     else
-        echo "❌ $service 重启失败"
+        echo "❌ $service 重新创建失败"
     fi
 done
 
