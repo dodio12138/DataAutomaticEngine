@@ -67,7 +67,7 @@ def calculate_daily_summary(store_codes: List[str], dates: List[str]) -> dict:
                 print(f"🏪 店铺: {code}, 📅 日期: {date_str}")
                 print(f"{'='*60}")
                 
-                # 直接从 raw_orders 表聚合计算
+                # 直接从 raw_orders 表聚合计算（排除已取消订单 orderStatus = 8）
                 cursor.execute("""
                     SELECT 
                         store_code,
@@ -79,6 +79,7 @@ def calculate_daily_summary(store_codes: List[str], dates: List[str]) -> dict:
                     WHERE platform = 'panda'
                       AND store_code = %s
                       AND DATE(order_date) = %s
+                      AND (payload->'data'->>'orderStatus')::int != 8
                     GROUP BY store_code, store_name
                 """, (code, date_str))
                 
