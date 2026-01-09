@@ -47,6 +47,7 @@ def aggregate_hourly_sales(start_date: str = None, end_date: str = None):
     print()
     
     # 1. 聚合 Deliveroo 数据（从 orders 表）
+    # 使用总营业额 total_amount
     print("🔄 处理 Deliveroo 数据...")
     deliveroo_query = """
         INSERT INTO hourly_sales (date_time, date, hour, store_code, store_name, platform, order_count, total_sales)
@@ -80,6 +81,7 @@ def aggregate_hourly_sales(start_date: str = None, end_date: str = None):
     print(f"  ✅ Deliveroo: {deliveroo_count} 条小时记录")
     
     # 2. 聚合 HungryPanda 数据（从 raw_orders 表）
+    # 使用总营业额 fixedPrice（从 payload 提取）
     print("🔄 处理 HungryPanda 数据...")
     panda_query = """
         INSERT INTO hourly_sales (date_time, date, hour, store_code, store_name, platform, order_count, total_sales)
@@ -91,7 +93,7 @@ def aggregate_hourly_sales(start_date: str = None, end_date: str = None):
             MAX(s.name_cn) AS store_name,
             'hungrypanda' AS platform,
             COUNT(*) AS order_count,
-            SUM(estimated_revenue) AS total_sales
+            SUM((payload->'data'->>'fixedPrice')::numeric) AS total_sales
         FROM raw_orders ro
         LEFT JOIN stores s ON ro.store_code = s.code
         WHERE 
@@ -99,6 +101,7 @@ def aggregate_hourly_sales(start_date: str = None, end_date: str = None):
             AND DATE(order_date) <= %s
             AND ro.platform = 'panda'
             AND ro.store_code IS NOT NULL
+            AND (payload->'data'->>'orderStatus')::int != 8
         GROUP BY DATE_TRUNC('hour', order_date), DATE(order_date), EXTRACT(HOUR FROM order_date), store_code
         ON CONFLICT (date_time, store_code, platform) 
         DO UPDATE SET
