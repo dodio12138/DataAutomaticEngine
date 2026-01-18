@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from utils import get_db_conn
 from routers import crawler, etl, reminder, feishu_bot, feishu_sync
-from routers import deliveroo_summary, panda_summary, store_ratings, order_details, order_stats, hourly_sales
+from routers import deliveroo_summary, panda_summary, store_ratings, order_details, order_stats, hourly_sales, store_ratings_sync
 from contextlib import asynccontextmanager
 import threading
 import nest_asyncio
@@ -88,6 +88,7 @@ app.include_router(store_ratings.router)
 app.include_router(order_details.router)
 app.include_router(order_stats.router)
 app.include_router(hourly_sales.router)
+app.include_router(store_ratings_sync.router)
 app.include_router(etl.router)
 app.include_router(reminder.router)
 app.include_router(feishu_bot.router)
