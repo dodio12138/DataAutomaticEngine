@@ -63,3 +63,4 @@ htmlcov/
 *~.nib
 api/__pycache__/main.cpython-311.pyc
 *.pyc
+__pycache__/
