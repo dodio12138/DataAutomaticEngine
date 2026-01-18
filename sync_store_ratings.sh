@@ -5,11 +5,44 @@
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo "⭐ 店铺评分数据飞书同步"
-echo "=============================="
-echo ""
+# 帮助信息
+show_help() {
+    echo -e "${BLUE}⭐ 店铺评分数据飞书同步${NC}"
+    echo "=============================="
+    echo ""
+    echo "用法: ./sync_store_ratings.sh [开始日期] [结束日期]"
+    echo ""
+    echo "选项:"
+    echo "  -h, --help          显示帮助信息"
+    echo ""
+    echo "说明:"
+    echo "  • 不传参数：默认同步昨天的数据"
+    echo "  • 传1个日期：同步指定日期的数据"
+    echo "  • 传2个日期：同步日期范围内所有数据"
+    echo ""
+    echo "示例:"
+    echo "  ./sync_store_ratings.sh"
+    echo "    → 同步昨天的数据"
+    echo ""
+    echo "  ./sync_store_ratings.sh 2026-01-15"
+    echo "    → 同步 2026-01-15 当天的数据"
+    echo ""
+    echo "  ./sync_store_ratings.sh 2026-01-10 2026-01-15"
+    echo "    → 同步 2026-01-10 至 2026-01-15 之间所有日期的数据"
+    echo ""
+    echo "数据流程:"
+    echo "  评分爬虫 → store_ratings 表 → 飞书多维表格"
+    echo ""
+    echo "注意事项:"
+    echo "  • 确保数据库中有对应日期的评分数据"
+    echo "  • 使用 ./manual_ratings.sh 爬取评分数据"
+    echo "  • 查看日志: ls -lt api/logs/store_ratings_sync_*.log"
+    echo ""
+    exit 0
+}
 
 # 参数处理
 START_DATE=""
@@ -18,24 +51,40 @@ END_DATE=""
 # 解析参数
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --start-date)
-            START_DATE="$2"
-            shift 2
-            ;;
-        --end-date)
-            END_DATE="$2"
-            shift 2
+        -h|--help)
+            show_help
             ;;
         *)
-            # 如果是日期格式，作为单个日期
+            # 如果是日期格式
             if [[ $1 =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-                START_DATE="$1"
-                END_DATE="$1"
+                if [[ -z "$START_DATE" ]]; then
+                    START_DATE="$1"
+                elif [[ -z "$END_DATE" ]]; then
+                    END_DATE="$1"
+                else
+                    echo -e "${RED}❌ 参数过多${NC}"
+                    echo "使用 --help 查看帮助信息"
+                    exit 1
+                fi
+            else
+                echo -e "${RED}❌ 无效的日期格式: $1${NC}"
+                echo "正确格式: YYYY-MM-DD"
+                echo "使用 --help 查看帮助信息"
+                exit 1
             fi
             shift
             ;;
     esac
 done
+
+# 如果只指定了开始日期，结束日期等于开始日期
+if [[ -n "$START_DATE" ]] && [[ -z "$END_DATE" ]]; then
+    END_DATE="$START_DATE"
+fi
+
+echo "⭐ 店铺评分数据飞书同步"
+echo "=============================="
+echo ""
 
 # 默认使用昨天
 if [[ -z "$START_DATE" ]] && [[ -z "$END_DATE" ]]; then
