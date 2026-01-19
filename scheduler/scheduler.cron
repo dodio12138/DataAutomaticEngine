@@ -6,7 +6,7 @@
 0 1 * * * /bin/bash -c 'curl -s -X POST http://api:8000/run/store-ratings -H "Content-Type: application/json" -d '"'"'{"stores":["all"]}'"'"' >> /var/log/cron-ratings.log 2>&1'
 
 # 每天凌晨1点30分同步店铺评分数据到飞书多维表格（等待评分爬取完成）
-30 1 * * * /bin/bash -c 'sleep 60 && curl -s -X POST http://api:8000/run/store-ratings/sync-feishu -H "Content-Type: application/json" -d '"'"'{}'"'"' >> /var/log/cron-ratings-sync.log 2>&1'
+0 2 * * * /bin/bash -c 'sleep 60 && curl -s -X POST http://api:8000/run/store-ratings/sync-feishu -H "Content-Type: application/json" -d '"'"'{}'"'"' >> /var/log/cron-ratings-sync.log 2>&1'
 
 # 每天凌晨4点执行 HungryPanda 爬虫任务（抓取所有店铺订单，随机延迟1-5分钟）
 0 4 * * * /bin/bash -c 'sleep $((60 + RANDOM % 240)) && curl -s -X POST http://api:8000/run/crawler -H "Content-Type: application/json" -d '"'"'{"platform":"panda","store_code":"all"}'"'"' >> /var/log/cron-panda.log 2>&1'

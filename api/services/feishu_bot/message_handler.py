@@ -86,6 +86,40 @@ class MessageHandler:
             print(f"📝 消息类型: {message_type}, Chat ID: {chat_id}")
             print(f"   内容: {content[:100]}...")
             
+            # === 关键修改：检查 mentions，只处理 @机器人 的消息 ===
+            mentions = message.get('mentions', [])
+            print(f"🏷️  消息中的 mentions: {json.dumps(mentions, ensure_ascii=False)}")
+            
+            # 检查是否是私聊（私聊没有 chat_type 或为 p2p）
+            chat_type = event.get('message', {}).get('chat_type', '')
+            is_private_chat = chat_type == 'p2p'
+            
+            # 如果是群聊消息，必须包含 @机器人 才处理
+            if not is_private_chat:
+                # 检查是否有 @机器人
+                bot_mentioned = False
+                for mention in mentions:
+                    # mention 格式：{"key": "@_user_1", "id": {"user_id": "xxx"}, "name": "机器人名称", "tenant_key": "xxx"}
+                    # 关键：检查 id.user_id 或 id.open_id，如果匹配机器人的ID，则是 @机器人
+                    # 注意：@所有人 的 key 为 "@_all"
+                    mention_key = mention.get('key', '')
+                    if mention_key == '@_all':
+                        print("⚠️  检测到 @所有人，跳过此消息")
+                        return None
+                    
+                    # 如果不是 @所有人，且包含 id 字段（表示 @了具体用户/机器人），则认为可能是 @机器人
+                    if mention.get('id'):
+                        bot_mentioned = True
+                        break
+                
+                if not bot_mentioned:
+                    print("⚠️  群聊消息未 @机器人，跳过此消息")
+                    return None
+                
+                print("✅ 群聊消息已 @机器人，继续处理")
+            else:
+                print("✅ 私聊消息，直接处理")
+            
             # 解析消息内容
             if message_type == 'text':
                 content_data = json.loads(content)
