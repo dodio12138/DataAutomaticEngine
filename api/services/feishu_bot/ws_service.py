@@ -82,9 +82,14 @@ class FeishuWebSocketService:
                     
                     # === 关键修改：检查 mentions，只处理 @机器人 的消息 ===
                     # 获取 mentions 列表（飞书 SDK 的 message 对象）
-                    mentions = message.mentions if hasattr(message, 'mentions') else []
+                    mentions = message.mentions if (hasattr(message, 'mentions') and message.mentions is not None) else []
                     
-                    print(f"🏷️  消息中的 mentions: {[m.key if hasattr(m, 'key') else str(m) for m in mentions]}")
+                    # 打印 mentions 信息（安全处理）
+                    try:
+                        mention_keys = [m.key if hasattr(m, 'key') else str(m) for m in mentions]
+                        print(f"🏷️  消息中的 mentions: {mention_keys}")
+                    except Exception as e:
+                        print(f"🏷️  消息中的 mentions: [] (解析失败: {e})")
                     
                     # 如果是群聊消息，必须包含 @机器人 才处理
                     if chat_type != "p2p":
@@ -92,19 +97,29 @@ class FeishuWebSocketService:
                         has_at_all = False
                         bot_mentioned = False
                         
+                        # 检查文本中是否包含 @_all（更直接的方式）
+                        if '@_all' in text:
+                            has_at_all = True
+                            print("⚠️  检测到 @所有人（从文本），跳过此消息")
+                        
+                        # 遍历 mentions 列表
                         for mention in mentions:
-                            # 获取 mention 的 key 属性
-                            mention_key = mention.key if hasattr(mention, 'key') else ""
-                            
-                            # 检测 @所有人
-                            if mention_key == '@_all':
-                                has_at_all = True
-                                print("⚠️  检测到 @所有人，跳过此消息")
-                                break
-                            
-                            # 如果有其他 mention（@具体用户/机器人），认为可能是 @机器人
-                            if mention_key and mention_key != '@_all':
-                                bot_mentioned = True
+                            try:
+                                # 获取 mention 的 key 属性
+                                mention_key = mention.key if hasattr(mention, 'key') else ""
+                                
+                                # 检测 @所有人
+                                if mention_key == '@_all':
+                                    has_at_all = True
+                                    print("⚠️  检测到 @所有人（从 mentions），跳过此消息")
+                                    break
+                                
+                                # 如果有其他 mention（@具体用户/机器人），认为可能是 @机器人
+                                if mention_key and mention_key != '@_all':
+                                    bot_mentioned = True
+                            except Exception as e:
+                                print(f"⚠️  解析 mention 时出错: {e}")
+                                continue
                         
                         # 如果是 @所有人，直接返回不处理
                         if has_at_all:
