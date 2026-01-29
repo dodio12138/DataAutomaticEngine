@@ -3,7 +3,8 @@ CREATE OR REPLACE FUNCTION raw_orders_keyword_count(
     p_keyword TEXT,
     p_start_date DATE DEFAULT NULL,
     p_end_date DATE DEFAULT NULL,
-    p_platform TEXT DEFAULT NULL
+    p_platform TEXT DEFAULT NULL,
+    p_store_code TEXT DEFAULT NULL
 )
 RETURNS BIGINT
 LANGUAGE SQL
@@ -20,6 +21,9 @@ AS $$
     )
     AND (
         p_platform IS NULL OR platform = p_platform
+    )
+    AND (
+        p_store_code IS NULL OR store_code = p_store_code
     )
     AND payload::text ILIKE ('%' || p_keyword || '%');
 $$;
