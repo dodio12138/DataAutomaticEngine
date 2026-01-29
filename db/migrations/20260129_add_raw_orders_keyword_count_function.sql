@@ -88,6 +88,7 @@ $$;
 CREATE OR REPLACE FUNCTION raw_orders_cross_store_customers(
     p_store_code_a TEXT,
     p_store_code_b TEXT,
+    p_platform TEXT DEFAULT NULL,
     p_start_date DATE DEFAULT NULL,
     p_end_date DATE DEFAULT NULL
 )
@@ -108,7 +109,8 @@ AS $$
                 ELSE NULL
             END AS user_id
         FROM raw_orders
-        WHERE store_code IN (p_store_code_a, p_store_code_b)
+                WHERE store_code IN (p_store_code_a, p_store_code_b)
+                    AND (p_platform IS NULL OR platform = p_platform)
     ),
     filtered_orders AS (
         SELECT *

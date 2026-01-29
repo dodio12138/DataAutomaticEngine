@@ -71,7 +71,7 @@ SELECT * FROM raw_orders_repeat_rate('deliveroo', 'battersea_maocai', '2025-12-0
 
 ## 3) raw_orders_cross_store_customers
 
-**用途**：统计两个店铺在同一平台下的交叉顾客数量（按平台分别返回）。日期不传默认本月。
+**用途**：统计两个店铺在同一平台下的交叉顾客数量（按平台分别返回）。日期不传默认本月；平台不传默认返回两平台。
 
 **用户标识**：
 - **panda**：`payload->'data'->'merchantOrderAddressResVO'->>'consigneeTelMask'`
@@ -82,6 +82,7 @@ SELECT * FROM raw_orders_repeat_rate('deliveroo', 'battersea_maocai', '2025-12-0
 raw_orders_cross_store_customers(
   p_store_code_a TEXT,
   p_store_code_b TEXT,
+  p_platform TEXT DEFAULT NULL,
   p_start_date DATE DEFAULT NULL,
   p_end_date DATE DEFAULT NULL
 ) RETURNS TABLE(
@@ -93,10 +94,13 @@ raw_orders_cross_store_customers(
 **示例**：
 ```sql
 -- 本月，统计两个店铺在两平台的交叉顾客数量
-SELECT * FROM raw_orders_cross_store_customers('east_maocai', 'piccadilly_maocai', NULL, NULL);
+SELECT * FROM raw_orders_cross_store_customers('east_maocai', 'piccadilly_maocai', NULL, NULL, NULL);
+
+-- 指定平台
+SELECT * FROM raw_orders_cross_store_customers('east_maocai', 'piccadilly_maocai', 'deliveroo', NULL, NULL);
 
 -- 指定日期范围
-SELECT * FROM raw_orders_cross_store_customers('battersea_maocai', 'piccadilly_maocai', '2025-12-01', '2025-12-31');
+SELECT * FROM raw_orders_cross_store_customers('battersea_maocai', 'piccadilly_maocai', NULL, '2025-12-01', '2025-12-31');
 ```
 
 ---
