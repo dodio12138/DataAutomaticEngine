@@ -33,7 +33,7 @@ SELECT raw_orders_keyword_count('猪肉水饺', '2025-12-01', '2025-12-31', 'del
 
 ## 2) raw_orders_repeat_rate
 
-**用途**：按平台统计复购率（下单次数 ≥ 2 的用户占比），支持店铺与日期范围过滤。日期不传默认本月。
+**用途**：按平台统计复购率（下单次数 ≥ 2 的用户占比），支持店铺与日期范围过滤。日期不传默认本月；平台不传默认返回两平台。
 
 **用户标识**：
 - **panda**：`payload->'data'->'merchantOrderAddressResVO'->>'consigneeTelMask'`
@@ -42,7 +42,7 @@ SELECT raw_orders_keyword_count('猪肉水饺', '2025-12-01', '2025-12-31', 'del
 **签名**：
 ```sql
 raw_orders_repeat_rate(
-  p_platform TEXT,
+  p_platform TEXT DEFAULT NULL,
   p_store_code TEXT DEFAULT NULL,
   p_start_date DATE DEFAULT NULL,
   p_end_date DATE DEFAULT NULL
@@ -57,6 +57,9 @@ raw_orders_repeat_rate(
 
 **示例**：
 ```sql
+-- 平台不传，默认本月，返回两平台
+SELECT * FROM raw_orders_repeat_rate(NULL, NULL, NULL, NULL);
+
 -- panda 平台，默认本月，全店铺
 SELECT * FROM raw_orders_repeat_rate('panda', NULL, NULL, NULL);
 

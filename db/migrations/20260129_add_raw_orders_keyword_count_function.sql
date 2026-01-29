@@ -30,7 +30,7 @@ $$;
 
 -- 复购率统计：可按平台/店铺/日期范围过滤（日期默认本月）
 CREATE OR REPLACE FUNCTION raw_orders_repeat_rate(
-    p_platform TEXT,
+    p_platform TEXT DEFAULT NULL,
     p_store_code TEXT DEFAULT NULL,
     p_start_date DATE DEFAULT NULL,
     p_end_date DATE DEFAULT NULL
@@ -55,7 +55,7 @@ AS $$
                 ELSE NULL
             END AS user_id
         FROM raw_orders
-        WHERE platform = p_platform
+                WHERE (p_platform IS NULL OR platform = p_platform)
           AND (p_store_code IS NULL OR store_code = p_store_code)
     ),
     filtered_orders AS (
@@ -75,12 +75,13 @@ AS $$
         GROUP BY platform, store_code, user_id
     )
     SELECT
-        p_platform AS platform,
+        platform,
         p_store_code AS store_code,
         COUNT(*) FILTER (WHERE orders >= 2) AS repeat_users,
         COUNT(*) AS total_users,
         ROUND(COUNT(*) FILTER (WHERE orders >= 2)::numeric / NULLIF(COUNT(*), 0), 4) AS repeat_rate
-    FROM user_counts;
+    FROM user_counts
+    GROUP BY platform;
 $$;
 
 -- 统计两个店铺在各平台的交叉顾客数（日期默认本月）
