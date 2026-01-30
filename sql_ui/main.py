@@ -3,8 +3,11 @@ import re
 from typing import List, Tuple, Optional, Dict, Any
 import csv
 import io
+import datetime
+import importlib.util
 
 import psycopg2
+from psycopg2 import sql
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -131,6 +134,21 @@ def build_csv_response(filename: str, columns: List[str], rows: List[Tuple]):
     return response
 
 
+def load_store_codes() -> List[str]:
+    path = os.getenv("STORE_CONFIG_PATH", "/app/crawler/store_config.py")
+    if not os.path.exists(path):
+        return []
+    spec = importlib.util.spec_from_file_location("store_config", path)
+    if spec is None or spec.loader is None:
+        return []
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    store_code_map = getattr(module, "store_code_map", {})
+    if isinstance(store_code_map, dict):
+        return sorted(store_code_map.keys())
+    return []
+
+
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=get_env("SQL_UI_SECRET_KEY", "change_me"))
 
@@ -139,6 +157,29 @@ templates = Jinja2Templates(directory="templates")
 
 def is_logged_in(request: Request) -> bool:
     return bool(request.session.get("user"))
+
+
+def is_superuser(request: Request) -> bool:
+    return request.session.get("role") == "superuser"
+
+
+def audit_log_path() -> str:
+    log_dir = os.getenv("SQL_UI_LOG_DIR", "/app/logs")
+    os.makedirs(log_dir, exist_ok=True)
+    return os.path.join(log_dir, "audit.log")
+
+
+def log_audit(request: Request, action: str, detail: str = ""):
+    try:
+        username = request.session.get("user", "-")
+        role = request.session.get("role", "-")
+        ip = request.client.host if request.client else "-"
+        ts = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        line = f"{ts}\t{ip}\t{username}\t{role}\t{action}\t{detail}\n"
+        with open(audit_log_path(), "a", encoding="utf-8") as f:
+            f.write(line)
+    except Exception:
+        pass
 
 
 def render_dashboard(request: Request, context: Optional[Dict[str, Any]] = None):
@@ -173,6 +214,8 @@ def render_dashboard(request: Request, context: Optional[Dict[str, Any]] = None)
         "form": {},
         "tables": tables,
         "views": views,
+        "platforms": ["panda", "deliveroo"],
+        "store_codes": load_store_codes(),
         "active_result": None,
         "active_title": "",
         "pt_columns": [],
@@ -181,6 +224,8 @@ def render_dashboard(request: Request, context: Optional[Dict[str, Any]] = None)
         "total_pages": None,
         "page_size": None,
         "current_page": None,
+        "is_superuser": is_superuser(request),
+        "audit_lines": [],
     }
     if context:
         base.update(context)
@@ -196,9 +241,19 @@ def login_page(request: Request):
 def login(request: Request, username: str = Form(...), password: str = Form(...)):
     expected_user = get_env("SQL_UI_USERNAME", "admin")
     expected_pass = get_env("SQL_UI_PASSWORD", "change_me")
+    super_user = get_env("SQL_UI_SUPER_USERNAME", "superadmin")
+    super_pass = get_env("SQL_UI_SUPER_PASSWORD", "change_me_super")
+    if username == super_user and password == super_pass:
+        request.session["user"] = username
+        request.session["role"] = "superuser"
+        log_audit(request, "login", "success")
+        return RedirectResponse(url="/", status_code=303)
     if username == expected_user and password == expected_pass:
         request.session["user"] = username
+        request.session["role"] = "user"
+        log_audit(request, "login", "success")
         return RedirectResponse(url="/", status_code=303)
+    log_audit(request, "login", "failed")
     return templates.TemplateResponse("login.html", {"request": request, "error": "账号或密码错误"})
 
 
@@ -213,6 +268,72 @@ def index(request: Request):
     if not is_logged_in(request):
         return RedirectResponse(url="/login", status_code=303)
     return render_dashboard(request)
+
+
+@app.get("/audit", response_class=HTMLResponse)
+def audit(request: Request, page: Optional[str] = None, limit: Optional[str] = None):
+    if not is_logged_in(request):
+        return RedirectResponse(url="/login", status_code=303)
+    if not is_superuser(request):
+        return RedirectResponse(url="/", status_code=303)
+
+    try:
+        page_value = clamp_page(page)
+        limit_value = clamp_limit(limit)
+        with open(audit_log_path(), "r", encoding="utf-8") as f:
+            lines = [line for line in f.readlines() if line.strip()]
+        total_count = len(lines)
+        total_pages = max((total_count + limit_value - 1) // limit_value, 1)
+        page_value = min(page_value, total_pages)
+        start = (page_value - 1) * limit_value
+        end = start + limit_value
+        page_lines = lines[start:end]
+        audit_lines = [line.strip().split("\t") for line in page_lines]
+        next_page = page_value + 1 if page_value < total_pages else None
+        prev_page = page_value - 1 if page_value > 1 else None
+    except Exception:
+        audit_lines = []
+        total_count = 0
+        total_pages = 1
+        page_value = 1
+        limit_value = 50
+        next_page = None
+        prev_page = None
+
+    return render_dashboard(
+        request,
+        {
+            "active_result": "audit",
+            "active_title": "访问审计日志（最近 200 条）",
+            "audit_lines": audit_lines,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "page_size": limit_value,
+            "current_page": page_value,
+            "form": {
+                "audit_limit": str(limit_value),
+                "pager_prev_action": "/audit" if prev_page else "",
+                "pager_prev_fields": {
+                    "page": str(prev_page) if prev_page else "",
+                    "limit": str(limit_value),
+                } if prev_page else {},
+                "pager_next_action": "/audit" if next_page else "",
+                "pager_next_fields": {
+                    "page": str(next_page) if next_page else "",
+                    "limit": str(limit_value),
+                } if next_page else {},
+                "pager_jump_action": "/audit",
+                "pager_jump_fields": {
+                    "limit": str(limit_value),
+                },
+            },
+        },
+    )
+
+
+@app.post("/audit", response_class=HTMLResponse)
+def audit_post(request: Request, page: Optional[str] = Form("1"), limit: Optional[str] = Form("50")):
+    return audit(request, page=page, limit=limit)
 
 
 @app.post("/tool/keyword-count", response_class=HTMLResponse)
@@ -232,9 +353,23 @@ def keyword_count(
     platform = parse_optional_date(platform)
     store_code = parse_optional_date(store_code)
 
-    sql = "SELECT raw_orders_keyword_count(%s, %s, %s, %s, %s) AS count;"
+    keywords = [k.strip() for k in keyword.split("&") if k.strip()]
+    if not keywords:
+        return render_dashboard(request, {"errors": {"keyword_count": "关键词不能为空"}})
+
+    select_parts = []
+    params: List[Optional[str]] = []
+    for kw in keywords:
+        select_parts.append(
+            sql.SQL(
+                "SELECT %s AS keyword, raw_orders_keyword_count(%s, %s, %s, %s, %s) AS count"
+            )
+        )
+        params.extend([kw, kw, start_date, end_date, platform, store_code])
+    query = sql.SQL(" UNION ALL ").join(select_parts)
     try:
-        columns, rows, has_more = run_query(sql, (keyword, start_date, end_date, platform, store_code))
+        columns, rows, has_more = run_query(query, tuple(params))
+        log_audit(request, "keyword_count", f"keyword={keyword},platform={platform},store={store_code}")
         return render_dashboard(
             request,
             {
@@ -252,6 +387,7 @@ def keyword_count(
             },
         )
     except Exception as exc:
+        log_audit(request, "keyword_count", f"error={exc}")
         return render_dashboard(request, {"errors": {"keyword_count": str(exc)}})
 
 
@@ -274,6 +410,7 @@ def repeat_rate(
     sql = "SELECT * FROM raw_orders_repeat_rate(%s, %s, %s, %s);"
     try:
         columns, rows, has_more = run_query(sql, (platform, store_code, start_date, end_date))
+        log_audit(request, "repeat_rate", f"platform={platform},store={store_code}")
         return render_dashboard(
             request,
             {
@@ -290,6 +427,7 @@ def repeat_rate(
             },
         )
     except Exception as exc:
+        log_audit(request, "repeat_rate", f"error={exc}")
         return render_dashboard(request, {"errors": {"repeat_rate": str(exc)}})
 
 
@@ -312,6 +450,7 @@ def cross_store(
     sql = "SELECT * FROM raw_orders_cross_store_customers(%s, %s, %s, %s, %s);"
     try:
         columns, rows, has_more = run_query(sql, (store_code_a, store_code_b, platform, start_date, end_date))
+        log_audit(request, "cross_store", f"a={store_code_a},b={store_code_b},platform={platform}")
         return render_dashboard(
             request,
             {
@@ -329,6 +468,7 @@ def cross_store(
             },
         )
     except Exception as exc:
+        log_audit(request, "cross_store", f"error={exc}")
         return render_dashboard(request, {"errors": {"cross_store": str(exc)}})
 
 
@@ -365,6 +505,7 @@ def panda_phone_stats(
     """
     try:
         columns, rows, has_more = run_query(sql, (platform, store_code, store_code, start_date, end_date))
+        log_audit(request, "panda_phones", f"store={store_code}")
         return render_dashboard(
             request,
             {
@@ -381,6 +522,7 @@ def panda_phone_stats(
             },
         )
     except Exception as exc:
+        log_audit(request, "panda_phones", f"error={exc}")
         return render_dashboard(request, {"errors": {"panda_phones": str(exc)}})
 
 
@@ -415,6 +557,7 @@ def deliveroo_customer_stats(
     """
     try:
         columns, rows, has_more = run_query(sql, (store_code, store_code, start_date, end_date))
+        log_audit(request, "deliveroo_customers", f"store={store_code}")
         return render_dashboard(
             request,
             {
@@ -430,6 +573,7 @@ def deliveroo_customer_stats(
             },
         )
     except Exception as exc:
+        log_audit(request, "deliveroo_customers", f"error={exc}")
         return render_dashboard(request, {"errors": {"deliveroo_customers": str(exc)}})
 
 
@@ -445,6 +589,7 @@ def sql_readonly(
 
     allowed, error_msg, clean_sql = validate_readonly_sql(sql)
     if not allowed:
+        log_audit(request, "sql_readonly", f"blocked={error_msg}")
         return render_dashboard(request, {"errors": {"sql_readonly": error_msg}, "form": {"sql_text": sql}})
 
     try:
@@ -496,6 +641,7 @@ def sql_readonly(
             },
         )
     except Exception as exc:
+        log_audit(request, "sql_readonly", f"error={exc}")
         return render_dashboard(request, {"errors": {"sql_readonly": str(exc)}, "form": {"sql_text": sql}})
 
 
@@ -528,6 +674,7 @@ def export_csv(
             order_sql = f" ORDER BY {sort_by} {sort_dir}" if sort_by else ""
             sql = f"SELECT * FROM {table_name}{order_sql} LIMIT %s"
             columns, rows, _ = run_query_with_limit(sql, (export_limit,), export_limit)
+            log_audit(request, "export", f"table={table_name}")
             return build_csv_response(f"{table_name}.csv", columns, rows)
 
         if kind == "preview_view" and view_name:
@@ -539,6 +686,7 @@ def export_csv(
             order_sql = f" ORDER BY {sort_by} {sort_dir}" if sort_by else ""
             sql = f"SELECT * FROM {view_name}{order_sql} LIMIT %s"
             columns, rows, _ = run_query_with_limit(sql, (export_limit,), export_limit)
+            log_audit(request, "export", f"view={view_name}")
             return build_csv_response(f"{view_name}.csv", columns, rows)
 
         if kind == "sql_readonly" and sql_text:
@@ -547,10 +695,12 @@ def export_csv(
                 raise ValueError(error_msg)
             wrapped = f"SELECT * FROM ({clean_sql}) AS t LIMIT %s"
             columns, rows, _ = run_query_with_limit(wrapped, (export_limit,), export_limit)
+            log_audit(request, "export", "sql")
             return build_csv_response("query.csv", columns, rows)
 
         raise ValueError("导出参数不完整")
     except Exception as exc:
+        log_audit(request, "export", f"error={exc}")
         return render_dashboard(request, {"errors": {"export": str(exc)}})
 
 
@@ -602,6 +752,7 @@ def preview_table(
     sql = f"SELECT * FROM {table_name}{order_sql} LIMIT %s OFFSET %s"
     try:
         columns, rows, has_more = run_query_with_limit(sql, (limit, offset), limit)
+        log_audit(request, "preview_table", f"table={table_name}")
         next_page = page + 1 if page < total_pages else None
         prev_page = page - 1 if page > 1 else None
         return render_dashboard(
@@ -649,6 +800,7 @@ def preview_table(
             },
         )
     except Exception as exc:
+        log_audit(request, "preview_table", f"error={exc}")
         return render_dashboard(request, {"errors": {"preview_table": str(exc)}})
 
 
@@ -700,6 +852,7 @@ def preview_view(
     sql = f"SELECT * FROM {view_name}{order_sql} LIMIT %s OFFSET %s"
     try:
         columns, rows, has_more = run_query_with_limit(sql, (limit, offset), limit)
+        log_audit(request, "preview_view", f"view={view_name}")
         next_page = page + 1 if page < total_pages else None
         prev_page = page - 1 if page > 1 else None
         return render_dashboard(
@@ -747,4 +900,5 @@ def preview_view(
             },
         )
     except Exception as exc:
+        log_audit(request, "preview_view", f"error={exc}")
         return render_dashboard(request, {"errors": {"preview_view": str(exc)}})

@@ -11,6 +11,7 @@
     .title { font-size:20px; font-weight:700; }
     .muted { color:#64748b; font-size:12px; }
     .logout { font-size:12px; color:#2563eb; text-decoration:none; }
+    .toolbar { display:flex; gap:8px; align-items:center; }
     .grid { display:grid; grid-template-columns: 380px 1fr; gap:16px; align-items:start; }
     .card { background:#fff; border-radius:14px; padding:16px; box-shadow:0 10px 30px rgba(15,23,42,0.08); }
     h2 { font-size:16px; margin:0 0 8px; }
@@ -39,7 +40,12 @@
       <div>
         <div class="title">数据分析面板</div>
       </div>
-      <a class="logout" href="/logout">退出</a>
+      <div class="toolbar">
+        {% if is_superuser %}
+          <a class="logout" href="/audit">审计日志</a>
+        {% endif %}
+        <a class="logout" href="/logout">退出</a>
+      </div>
     </div>
 
     <div class="grid">
@@ -117,12 +123,22 @@
       <details class="card" {% if results.keyword_count or errors.keyword_count %}open{% endif %}>
         <summary>关键词统计 <span class="summary-muted">按关键词统计记录数</span></summary>
         <form method="post" action="/tool/keyword-count">
-          <label>关键词</label>
-          <input name="keyword" required value="{{ form.keyword or '' }}" />
+          <label>关键词（支持用 & 连接多个）</label>
+          <input name="keyword" required placeholder="猪肉水饺&滑牛" value="{{ form.keyword or '' }}" />
           <label>平台（可空）</label>
-          <input name="platform" placeholder="panda / deliveroo" value="{{ form.platform or '' }}" />
+          <select name="platform">
+            <option value="">全部平台</option>
+            {% for p in platforms %}
+              <option value="{{ p }}" {% if form.platform==p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
           <label>店铺代码（可空，空=全部店铺）</label>
-          <input name="store_code" placeholder="battersea_maocai" value="{{ form.store_code or '' }}" />
+          <select name="store_code">
+            <option value="">全部店铺</option>
+            {% for code in store_codes %}
+              <option value="{{ code }}" {% if form.store_code==code %}selected{% endif %}>{{ code }}</option>
+            {% endfor %}
+          </select>
           <label>开始日期（可空，默认本月）</label>
           <input name="start_date" placeholder="YYYY-MM-DD" value="{{ form.start_date or '' }}" />
           <label>结束日期（可空，默认本月）</label>
@@ -136,9 +152,19 @@
         <summary>复购率 <span class="summary-muted">按平台统计复购率</span></summary>
         <form method="post" action="/tool/repeat-rate">
           <label>平台（可空=两平台）</label>
-          <input name="platform" placeholder="panda / deliveroo" value="{{ form.rr_platform or '' }}" />
+          <select name="platform">
+            <option value="">全部平台</option>
+            {% for p in platforms %}
+              <option value="{{ p }}" {% if form.rr_platform==p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
           <label>店铺代码（可空，空=全部店铺）</label>
-          <input name="store_code" placeholder="battersea_maocai" value="{{ form.rr_store_code or '' }}" />
+          <select name="store_code">
+            <option value="">全部店铺</option>
+            {% for code in store_codes %}
+              <option value="{{ code }}" {% if form.rr_store_code==code %}selected{% endif %}>{{ code }}</option>
+            {% endfor %}
+          </select>
           <label>开始日期（可空，默认本月）</label>
           <input name="start_date" placeholder="YYYY-MM-DD" value="{{ form.rr_start_date or '' }}" />
           <label>结束日期（可空，默认本月）</label>
@@ -152,11 +178,26 @@
         <summary>交叉顾客 <span class="summary-muted">两店铺交叉顾客数量</span></summary>
         <form method="post" action="/tool/cross-store">
           <label>店铺 A</label>
-          <input name="store_code_a" placeholder="east_maocai" value="{{ form.cs_store_code_a or '' }}" required />
+          <select name="store_code_a" required>
+            <option value="">请选择</option>
+            {% for code in store_codes %}
+              <option value="{{ code }}" {% if form.cs_store_code_a==code %}selected{% endif %}>{{ code }}</option>
+            {% endfor %}
+          </select>
           <label>店铺 B</label>
-          <input name="store_code_b" placeholder="piccadilly_maocai" value="{{ form.cs_store_code_b or '' }}" required />
+          <select name="store_code_b" required>
+            <option value="">请选择</option>
+            {% for code in store_codes %}
+              <option value="{{ code }}" {% if form.cs_store_code_b==code %}selected{% endif %}>{{ code }}</option>
+            {% endfor %}
+          </select>
           <label>平台（可空=两平台）</label>
-          <input name="platform" placeholder="panda / deliveroo" value="{{ form.cs_platform or '' }}" />
+          <select name="platform">
+            <option value="">全部平台</option>
+            {% for p in platforms %}
+              <option value="{{ p }}" {% if form.cs_platform==p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
           <label>开始日期（可空，默认本月）</label>
           <input name="start_date" placeholder="YYYY-MM-DD" value="{{ form.cs_start_date or '' }}" />
           <label>结束日期（可空，默认本月）</label>
@@ -170,9 +211,17 @@
         <summary>Panda 手机号掩码统计 <span class="summary-muted">总量与去重</span></summary>
         <form method="post" action="/tool/panda-phones">
           <label>平台（固定为 panda）</label>
-          <input name="platform" value="panda" />
+          <select name="platform" disabled>
+            <option value="panda" selected>panda</option>
+          </select>
+          <input type="hidden" name="platform" value="panda" />
           <label>店铺代码（可空，空=全部店铺）</label>
-          <input name="store_code" placeholder="battersea_maocai" value="{{ form.pp_store_code or '' }}" />
+          <select name="store_code">
+            <option value="">全部店铺</option>
+            {% for code in store_codes %}
+              <option value="{{ code }}" {% if form.pp_store_code==code %}selected{% endif %}>{{ code }}</option>
+            {% endfor %}
+          </select>
           <label>开始日期（可空，默认本月）</label>
           <input name="start_date" placeholder="YYYY-MM-DD" value="{{ form.pp_start_date or '' }}" />
           <label>结束日期（可空，默认本月）</label>
@@ -186,7 +235,12 @@
         <summary>Deliveroo 客户 ID 统计 <span class="summary-muted">总量与去重</span></summary>
         <form method="post" action="/tool/deliveroo-customers">
           <label>店铺代码（可空，空=全部店铺）</label>
-          <input name="store_code" placeholder="battersea_maocai" value="{{ form.dc_store_code or '' }}" />
+          <select name="store_code">
+            <option value="">全部店铺</option>
+            {% for code in store_codes %}
+              <option value="{{ code }}" {% if form.dc_store_code==code %}selected{% endif %}>{{ code }}</option>
+            {% endfor %}
+          </select>
           <label>开始日期（可空，默认本月）</label>
           <input name="start_date" placeholder="YYYY-MM-DD" value="{{ form.dc_start_date or '' }}" />
           <label>结束日期（可空，默认本月）</label>
@@ -201,7 +255,64 @@
         <details class="card" open>
           <summary>{{ active_title or '结果预览' }}</summary>
           {% if errors.export %}<div class="error">{{ errors.export }}</div>{% endif %}
-          {% if active_result and results[active_result] %}
+          {% if active_result == 'audit' %}
+            <div class="result-panel">
+              <table>
+                <thead>
+                  <tr>
+                    <th>时间(UTC)</th>
+                    <th>IP</th>
+                    <th>用户</th>
+                    <th>角色</th>
+                    <th>动作</th>
+                    <th>详情</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in audit_lines %}
+                    <tr>
+                      {% for cell in row %}<td>{{ cell }}</td>{% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <div class="pager">
+              {% if form.pager_prev_action %}
+                <form method="post" action="{{ form.pager_prev_action }}">
+                  {% for key, val in form.pager_prev_fields.items() %}
+                    <input type="hidden" name="{{ key }}" value="{{ val }}" />
+                  {% endfor %}
+                  <button type="submit">上一页</button>
+                </form>
+              {% else %}
+                <button class="disabled" disabled>上一页</button>
+              {% endif %}
+
+              {% if form.pager_jump_action %}
+                <form method="post" action="{{ form.pager_jump_action }}" style="display:flex; gap:6px; align-items:center;">
+                  {% for key, val in form.pager_jump_fields.items() %}
+                    <input type="hidden" name="{{ key }}" value="{{ val }}" />
+                  {% endfor %}
+                  <input name="page" type="number" min="1" value="{{ current_page or 1 }}" style="width:90px;" />
+                  <button type="submit">跳转</button>
+                </form>
+              {% endif %}
+
+              {% if form.pager_next_action %}
+                <form method="post" action="{{ form.pager_next_action }}">
+                  {% for key, val in form.pager_next_fields.items() %}
+                    <input type="hidden" name="{{ key }}" value="{{ val }}" />
+                  {% endfor %}
+                  <button type="submit">下一页</button>
+                </form>
+              {% else %}
+                <button class="disabled" disabled>下一页</button>
+              {% endif %}
+
+              <div class="muted" style="margin-left:auto;">共 {{ total_count or 0 }} 条 · {{ current_page or 1 }}/{{ total_pages or 1 }} 页</div>
+            </div>
+          {% elif active_result and results[active_result] %}
             <form method="post" action="/tool/export" style="margin-top:8px;">
               <input type="hidden" name="kind" value="{{ active_result }}" />
               <input type="hidden" name="table_name" value="{{ form.pt_table_name or '' }}" />

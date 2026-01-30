@@ -54,6 +54,9 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    volumes:
+      - ./sql_ui/logs:/app/logs
+      - ./crawler:/app/crawler:ro
     ports:
       - "8010:8010"
     restart: unless-stopped
