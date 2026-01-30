@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>数据分析面板</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:#f6f7fb; margin:0; color:#0f172a; }
+    .layout { max-width: 1200px; margin: 24px auto; padding: 0 16px 48px; }
+    .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+    .title { font-size:20px; font-weight:700; }
+    .muted { color:#64748b; font-size:12px; }
+    .logout { font-size:12px; color:#2563eb; text-decoration:none; }
+    .grid { display:grid; grid-template-columns: 380px 1fr; gap:16px; align-items:start; }
+    .card { background:#fff; border-radius:14px; padding:16px; box-shadow:0 10px 30px rgba(15,23,42,0.08); }
+    h2 { font-size:16px; margin:0 0 8px; }
+    label { display:block; font-size:12px; color:#475569; margin:8px 0 6px; }
+    input, select { width:100%; padding:8px 10px; border:1px solid #e2e8f0; border-radius:8px; }
+    textarea { width:100%; padding:8px 10px; border:1px solid #e2e8f0; border-radius:8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    button { margin-top:10px; padding:10px 12px; border:0; border-radius:8px; background:#2563eb; color:#fff; font-weight:600; cursor:pointer; }
+    .error { color:#dc2626; font-size:12px; margin-top:6px; }
+    table { width:100%; border-collapse: collapse; margin-top:12px; font-size:12px; }
+    th, td { border-bottom:1px solid #e2e8f0; text-align:left; padding:6px; }
+    th { background:#f8fafc; position:sticky; top:0; }
+    .section { margin-top:8px; }
+    details { border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px; background:#fff; }
+    details + details { margin-top:12px; }
+    summary { cursor:pointer; font-weight:600; }
+    .summary-muted { font-size:12px; color:#64748b; margin-left:6px; }
+    .result-panel { max-height: 70vh; overflow:auto; }
+    .pager { display:flex; gap:8px; align-items:center; margin-top:8px; }
+    .pager button { padding:6px 10px; }
+    .pager .disabled { background:#e2e8f0; color:#94a3b8; cursor:not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div class="header">
+      <div>
+        <div class="title">数据分析面板</div>
+      </div>
+      <a class="logout" href="/logout">退出</a>
+    </div>
+
+    <div class="grid">
+      <div>
+        <details class="card" {% if results.sql_readonly or errors.sql_readonly %}open{% endif %}>
+          <summary>SQL 只读查询 <span class="summary-muted">仅允许 SELECT / WITH</span></summary>
+          <form method="post" action="/tool/sql-readonly">
+            <label>SQL</label>
+            <textarea name="sql" placeholder="输入只读 SQL..." style="min-height:120px;">{{ form.sql_text or '' }}</textarea>
+            <label>每页行数（1-200）</label>
+            <input name="limit" type="number" min="1" max="200" value="{{ form.sql_limit or '200' }}" />
+            <button type="submit">执行</button>
+          </form>
+          {% if errors.sql_readonly %}<div class="error">{{ errors.sql_readonly }}</div>{% endif %}
+        </details>
+
+        <details class="card" {% if results.preview_table or errors.preview_table %}open{% endif %}>
+        <summary>表格预览 <span class="summary-muted">查看表数据与排序</span></summary>
+        <form method="post" action="/tool/preview-table">
+          <label>选择表</label>
+          <select name="table_name" required>
+            <option value="">请选择</option>
+            {% for t in tables %}
+              <option value="{{ t }}" {% if form.pt_table_name==t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+          <label>预览行数（1-200）</label>
+          <input name="limit" type="number" min="1" max="200" value="{{ form.pt_limit or '50' }}" />
+          <label>排序字段（可空）</label>
+          <select name="sort_by" {% if not pt_columns %}disabled{% endif %}>
+            <option value="">不排序</option>
+            {% for col in pt_columns %}
+              <option value="{{ col }}" {% if form.pt_sort_by==col %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+          <label>排序方向</label>
+          <select name="sort_dir">
+            <option value="asc" {% if form.pt_sort_dir=='asc' %}selected{% endif %}>ASC</option>
+            <option value="desc" {% if form.pt_sort_dir=='desc' %}selected{% endif %}>DESC</option>
+          </select>
+          <button type="submit">预览</button>
+        </form>
+        {% if errors.preview_table %}<div class="error">{{ errors.preview_table }}</div>{% endif %}
+      </details>
+
+      <details class="card" {% if results.preview_view or errors.preview_view %}open{% endif %}>
+        <summary>视图预览 <span class="summary-muted">查看视图数据与排序</span></summary>
+        <form method="post" action="/tool/preview-view">
+          <label>选择视图</label>
+          <select name="view_name" required>
+            <option value="">请选择</option>
+            {% for v in views %}
+              <option value="{{ v }}" {% if form.pv_view_name==v %}selected{% endif %}>{{ v }}</option>
+            {% endfor %}
+          </select>
+          <label>预览行数（1-200）</label>
+          <input name="limit" type="number" min="1" max="200" value="{{ form.pv_limit or '50' }}" />
+          <label>排序字段（可空）</label>
+          <select name="sort_by" {% if not pv_columns %}disabled{% endif %}>
+            <option value="">不排序</option>
+            {% for col in pv_columns %}
+              <option value="{{ col }}" {% if form.pv_sort_by==col %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+          <label>排序方向</label>
+          <select name="sort_dir">
+            <option value="asc" {% if form.pv_sort_dir=='asc' %}selected{% endif %}>ASC</option>
+            <option value="desc" {% if form.pv_sort_dir=='desc' %}selected{% endif %}>DESC</option>
+          </select>
+          <button type="submit">预览</button>
+        </form>
+        {% if errors.preview_view %}<div class="error">{{ errors.preview_view }}</div>{% endif %}
+      </details>
+
+      <details class="card" {% if results.keyword_count or errors.keyword_count %}open{% endif %}>
+        <summary>关键词统计 <span class="summary-muted">按关键词统计记录数</span></summary>
+        <form method="post" action="/tool/keyword-count">
+          <label>关键词</label>
+          <input name="keyword" required value="{{ form.keyword or '' }}" />
+          <label>平台（可空）</label>
+          <input name="platform" placeholder="panda / deliveroo" value="{{ form.platform or '' }}" />
+          <label>店铺代码（可空，空=全部店铺）</label>
+          <input name="store_code" placeholder="battersea_maocai" value="{{ form.store_code or '' }}" />
+          <label>开始日期（可空，默认本月）</label>
+          <input name="start_date" placeholder="YYYY-MM-DD" value="{{ form.start_date or '' }}" />
+          <label>结束日期（可空，默认本月）</label>
+          <input name="end_date" placeholder="YYYY-MM-DD" value="{{ form.end_date or '' }}" />
+          <button type="submit">统计</button>
+        </form>
+        {% if errors.keyword_count %}<div class="error">{{ errors.keyword_count }}</div>{% endif %}
+      </details>
+
+      <details class="card" {% if results.repeat_rate or errors.repeat_rate %}open{% endif %}>
+        <summary>复购率 <span class="summary-muted">按平台统计复购率</span></summary>
+        <form method="post" action="/tool/repeat-rate">
+          <label>平台（可空=两平台）</label>
+          <input name="platform" placeholder="panda / deliveroo" value="{{ form.rr_platform or '' }}" />
+          <label>店铺代码（可空，空=全部店铺）</label>
+          <input name="store_code" placeholder="battersea_maocai" value="{{ form.rr_store_code or '' }}" />
+          <label>开始日期（可空，默认本月）</label>
+          <input name="start_date" placeholder="YYYY-MM-DD" value="{{ form.rr_start_date or '' }}" />
+          <label>结束日期（可空，默认本月）</label>
+          <input name="end_date" placeholder="YYYY-MM-DD" value="{{ form.rr_end_date or '' }}" />
+          <button type="submit">统计</button>
+        </form>
+        {% if errors.repeat_rate %}<div class="error">{{ errors.repeat_rate }}</div>{% endif %}
+      </details>
+
+      <details class="card" {% if results.cross_store or errors.cross_store %}open{% endif %}>
+        <summary>交叉顾客 <span class="summary-muted">两店铺交叉顾客数量</span></summary>
+        <form method="post" action="/tool/cross-store">
+          <label>店铺 A</label>
+          <input name="store_code_a" placeholder="east_maocai" value="{{ form.cs_store_code_a or '' }}" required />
+          <label>店铺 B</label>
+          <input name="store_code_b" placeholder="piccadilly_maocai" value="{{ form.cs_store_code_b or '' }}" required />
+          <label>平台（可空=两平台）</label>
+          <input name="platform" placeholder="panda / deliveroo" value="{{ form.cs_platform or '' }}" />
+          <label>开始日期（可空，默认本月）</label>
+          <input name="start_date" placeholder="YYYY-MM-DD" value="{{ form.cs_start_date or '' }}" />
+          <label>结束日期（可空，默认本月）</label>
+          <input name="end_date" placeholder="YYYY-MM-DD" value="{{ form.cs_end_date or '' }}" />
+          <button type="submit">统计</button>
+        </form>
+        {% if errors.cross_store %}<div class="error">{{ errors.cross_store }}</div>{% endif %}
+      </details>
+
+      <details class="card" {% if results.panda_phones or errors.panda_phones %}open{% endif %}>
+        <summary>Panda 手机号掩码统计 <span class="summary-muted">总量与去重</span></summary>
+        <form method="post" action="/tool/panda-phones">
+          <label>平台（固定为 panda）</label>
+          <input name="platform" value="panda" />
+          <label>店铺代码（可空，空=全部店铺）</label>
+          <input name="store_code" placeholder="battersea_maocai" value="{{ form.pp_store_code or '' }}" />
+          <label>开始日期（可空，默认本月）</label>
+          <input name="start_date" placeholder="YYYY-MM-DD" value="{{ form.pp_start_date or '' }}" />
+          <label>结束日期（可空，默认本月）</label>
+          <input name="end_date" placeholder="YYYY-MM-DD" value="{{ form.pp_end_date or '' }}" />
+          <button type="submit">统计</button>
+        </form>
+        {% if errors.panda_phones %}<div class="error">{{ errors.panda_phones }}</div>{% endif %}
+      </details>
+
+      <details class="card" {% if results.deliveroo_customers or errors.deliveroo_customers %}open{% endif %}>
+        <summary>Deliveroo 客户 ID 统计 <span class="summary-muted">总量与去重</span></summary>
+        <form method="post" action="/tool/deliveroo-customers">
+          <label>店铺代码（可空，空=全部店铺）</label>
+          <input name="store_code" placeholder="battersea_maocai" value="{{ form.dc_store_code or '' }}" />
+          <label>开始日期（可空，默认本月）</label>
+          <input name="start_date" placeholder="YYYY-MM-DD" value="{{ form.dc_start_date or '' }}" />
+          <label>结束日期（可空，默认本月）</label>
+          <input name="end_date" placeholder="YYYY-MM-DD" value="{{ form.dc_end_date or '' }}" />
+          <button type="submit">统计</button>
+        </form>
+        {% if errors.deliveroo_customers %}<div class="error">{{ errors.deliveroo_customers }}</div>{% endif %}
+      </details>
+      </div>
+
+      <div>
+        <details class="card" open>
+          <summary>{{ active_title or '结果预览' }}</summary>
+          {% if errors.export %}<div class="error">{{ errors.export }}</div>{% endif %}
+          {% if active_result and results[active_result] %}
+            <form method="post" action="/tool/export" style="margin-top:8px;">
+              <input type="hidden" name="kind" value="{{ active_result }}" />
+              <input type="hidden" name="table_name" value="{{ form.pt_table_name or '' }}" />
+              <input type="hidden" name="view_name" value="{{ form.pv_view_name or '' }}" />
+              <input type="hidden" name="sql_text" value="{{ form.sql_text or '' }}" />
+              <input type="hidden" name="sort_by" value="{{ form.pt_sort_by or form.pv_sort_by or '' }}" />
+              <input type="hidden" name="sort_dir" value="{{ form.pt_sort_dir or form.pv_sort_dir or 'asc' }}" />
+              <input type="hidden" name="limit" value="{{ form.pt_limit or form.pv_limit or form.sql_limit or '1000' }}" />
+              <button type="submit">导出 CSV</button>
+            </form>
+            <div class="result-panel">
+              <table>
+              <thead><tr>{% for col in results[active_result].columns %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+              <tbody>
+                {% for row in results[active_result].rows %}
+                  <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+                {% endfor %}
+              </tbody>
+              </table>
+            </div>
+            <div class="pager">
+              {% if form.pager_prev_action %}
+                <form method="post" action="{{ form.pager_prev_action }}">
+                  {% for key, val in form.pager_prev_fields.items() %}
+                    <input type="hidden" name="{{ key }}" value="{{ val }}" />
+                  {% endfor %}
+                  <button type="submit">上一页</button>
+                </form>
+              {% else %}
+                <button class="disabled" disabled>上一页</button>
+              {% endif %}
+
+              {% if form.pager_jump_action %}
+                <form method="post" action="{{ form.pager_jump_action }}" style="display:flex; gap:6px; align-items:center;">
+                  {% for key, val in form.pager_jump_fields.items() %}
+                    <input type="hidden" name="{{ key }}" value="{{ val }}" />
+                  {% endfor %}
+                  <input name="page" type="number" min="1" value="{{ current_page or 1 }}" style="width:90px;" />
+                  <button type="submit">跳转</button>
+                </form>
+              {% endif %}
+
+              {% if form.pager_next_action %}
+                <form method="post" action="{{ form.pager_next_action }}">
+                  {% for key, val in form.pager_next_fields.items() %}
+                    <input type="hidden" name="{{ key }}" value="{{ val }}" />
+                  {% endfor %}
+                  <button type="submit">下一页</button>
+                </form>
+              {% else %}
+                <button class="disabled" disabled>下一页</button>
+              {% endif %}
+
+              <div class="muted" style="margin-left:auto;">共 {{ total_count or 0 }} 条 · {{ current_page or 1 }}/{{ total_pages or 1 }} 页</div>
+            </div>
+          {% else %}
+            <div class="muted">暂无结果</div>
+          {% endif %}
+        </details>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

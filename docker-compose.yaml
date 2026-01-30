@@ -45,5 +45,17 @@ services:
     volumes:
       - ./api/logs:/app/logs  # 日志目录共享
     restart: unless-stopped
+
+  sql_ui:
+    build: ./sql_ui
+    container_name: delivery_sql_ui
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "8010:8010"
+    restart: unless-stopped
 volumes:
   pg_data:
