@@ -32,6 +32,8 @@
     .pager { display:flex; gap:8px; align-items:center; margin-top:8px; }
     .pager button { padding:6px 10px; }
     .pager .disabled { background:#e2e8f0; color:#94a3b8; cursor:not-allowed; }
+    .inline { display:flex; align-items:center; gap:8px; font-size:12px; color:#475569; }
+    .inline input[type="checkbox"] { width:auto; }
   </style>
 </head>
 <body>
@@ -72,8 +74,11 @@
               <option value="{{ t }}" {% if form.pt_table_name==t %}selected{% endif %}>{{ t }}</option>
             {% endfor %}
           </select>
-          <label>预览行数（1-200）</label>
+          <label>预览行数（1-200，勾选全部则忽略）</label>
           <input name="limit" type="number" min="1" max="200" value="{{ form.pt_limit or '50' }}" />
+          <label class="inline">
+            <input type="checkbox" name="show_all" value="1" {% if form.pt_show_all %}checked{% endif %} /> 全部显示
+          </label>
           <label>排序字段（可空）</label>
           <select name="sort_by" {% if not pt_columns %}disabled{% endif %}>
             <option value="">不排序</option>
@@ -85,6 +90,31 @@
           <select name="sort_dir">
             <option value="asc" {% if form.pt_sort_dir=='asc' %}selected{% endif %}>ASC</option>
             <option value="desc" {% if form.pt_sort_dir=='desc' %}selected{% endif %}>DESC</option>
+          </select>
+          <label>时间字段（可空）</label>
+          <select name="time_column" {% if not pt_columns %}disabled{% endif %}>
+            <option value="">自动</option>
+            {% for col in pt_columns %}
+              <option value="{{ col }}" {% if form.pt_time_column==col %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+          <label>开始时间（可空）</label>
+          <input name="time_start" type="text" placeholder="YYYY-MM-DD" value="{{ form.pt_time_start or '' }}" />
+          <label>结束时间（可空）</label>
+          <input name="time_end" type="text" placeholder="YYYY-MM-DD" value="{{ form.pt_time_end or '' }}" />
+          <label>店铺字段（可空）</label>
+          <select name="store_column" {% if not pt_columns %}disabled{% endif %}>
+            <option value="">自动</option>
+            {% for col in pt_columns %}
+              <option value="{{ col }}" {% if form.pt_store_column==col %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+          <label>店铺代码（可空）</label>
+          <select name="store_code">
+            <option value="">全部店铺</option>
+            {% for code in store_codes %}
+              <option value="{{ code }}" {% if form.pt_store_code==code %}selected{% endif %}>{{ code }}</option>
+            {% endfor %}
           </select>
           <button type="submit">预览</button>
         </form>
@@ -101,8 +131,11 @@
               <option value="{{ v }}" {% if form.pv_view_name==v %}selected{% endif %}>{{ v }}</option>
             {% endfor %}
           </select>
-          <label>预览行数（1-200）</label>
+          <label>预览行数（1-200，勾选全部则忽略）</label>
           <input name="limit" type="number" min="1" max="200" value="{{ form.pv_limit or '50' }}" />
+          <label class="inline">
+            <input type="checkbox" name="show_all" value="1" {% if form.pv_show_all %}checked{% endif %} /> 全部显示
+          </label>
           <label>排序字段（可空）</label>
           <select name="sort_by" {% if not pv_columns %}disabled{% endif %}>
             <option value="">不排序</option>
@@ -114,6 +147,31 @@
           <select name="sort_dir">
             <option value="asc" {% if form.pv_sort_dir=='asc' %}selected{% endif %}>ASC</option>
             <option value="desc" {% if form.pv_sort_dir=='desc' %}selected{% endif %}>DESC</option>
+          </select>
+          <label>时间字段（可空）</label>
+          <select name="time_column" {% if not pv_columns %}disabled{% endif %}>
+            <option value="">自动</option>
+            {% for col in pv_columns %}
+              <option value="{{ col }}" {% if form.pv_time_column==col %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+          <label>开始时间（可空）</label>
+          <input name="time_start" type="text" placeholder="YYYY-MM-DD" value="{{ form.pv_time_start or '' }}" />
+          <label>结束时间（可空）</label>
+          <input name="time_end" type="text" placeholder="YYYY-MM-DD" value="{{ form.pv_time_end or '' }}" />
+          <label>店铺字段（可空）</label>
+          <select name="store_column" {% if not pv_columns %}disabled{% endif %}>
+            <option value="">自动</option>
+            {% for col in pv_columns %}
+              <option value="{{ col }}" {% if form.pv_store_column==col %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+          <label>店铺代码（可空）</label>
+          <select name="store_code">
+            <option value="">全部店铺</option>
+            {% for code in store_codes %}
+              <option value="{{ code }}" {% if form.pv_store_code==code %}selected{% endif %}>{{ code }}</option>
+            {% endfor %}
           </select>
           <button type="submit">预览</button>
         </form>
@@ -320,6 +378,12 @@
               <input type="hidden" name="sql_text" value="{{ form.sql_text or '' }}" />
               <input type="hidden" name="sort_by" value="{{ form.pt_sort_by or form.pv_sort_by or '' }}" />
               <input type="hidden" name="sort_dir" value="{{ form.pt_sort_dir or form.pv_sort_dir or 'asc' }}" />
+              <input type="hidden" name="time_column" value="{{ form.pt_time_column or form.pv_time_column or '' }}" />
+              <input type="hidden" name="time_start" value="{{ form.pt_time_start or form.pv_time_start or '' }}" />
+              <input type="hidden" name="time_end" value="{{ form.pt_time_end or form.pv_time_end or '' }}" />
+              <input type="hidden" name="store_column" value="{{ form.pt_store_column or form.pv_store_column or '' }}" />
+              <input type="hidden" name="store_code" value="{{ form.pt_store_code or form.pv_store_code or '' }}" />
+              <input type="hidden" name="show_all" value="{{ form.pt_show_all or form.pv_show_all or '' }}" />
               <input type="hidden" name="limit" value="{{ form.pt_limit or form.pv_limit or form.sql_limit or '1000' }}" />
               <button type="submit">导出 CSV</button>
             </form>

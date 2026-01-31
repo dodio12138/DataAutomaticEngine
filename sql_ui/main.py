@@ -15,6 +15,16 @@ from starlette.middleware.sessions import SessionMiddleware
 
 
 MAX_ROWS = 200
+DEFAULT_TIME_COLUMNS = [
+    "order_date",
+    "placed_at",
+    "date",
+    "created_at",
+    "updated_at",
+    "order_time",
+    "order_datetime",
+    "business_date",
+]
 FORBIDDEN_KEYWORDS = {
     "insert",
     "update",
@@ -94,6 +104,18 @@ def run_query_with_limit(sql: str, params: Tuple, limit: int) -> Tuple[List[str]
             return columns, rows[:fetch_limit], has_more
 
 
+def run_query_all(sql: str, params: Tuple = ()) -> Tuple[List[str], List[Tuple]]:
+    with get_db_conn() as conn:
+        conn.set_session(readonly=True, autocommit=True)
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            if cur.description is None:
+                return [], []
+            columns = [desc[0] for desc in cur.description]
+            rows = cur.fetchall()
+            return columns, rows
+
+
 def get_relation_columns(name: str) -> List[str]:
     sql = """
         SELECT column_name
@@ -120,6 +142,13 @@ def clamp_limit(value: Optional[str]) -> int:
         return min(max(limit, 1), MAX_ROWS)
     except ValueError:
         return 50
+
+
+def resolve_default_column(allowed_columns: List[str], candidates: List[str]) -> str:
+    for col in candidates:
+        if col in allowed_columns:
+            return col
+    return ""
 
 
 def build_csv_response(filename: str, columns: List[str], rows: List[Tuple]):
@@ -655,14 +684,31 @@ def export_csv(
     sort_by: Optional[str] = Form(None),
     sort_dir: Optional[str] = Form("asc"),
     limit: Optional[str] = Form("1000"),
+    time_column: Optional[str] = Form(None),
+    time_start: Optional[str] = Form(None),
+    time_end: Optional[str] = Form(None),
+    store_column: Optional[str] = Form(None),
+    store_code: Optional[str] = Form(None),
+    show_all: Optional[str] = Form(None),
 ):
     if not is_logged_in(request):
         return RedirectResponse(url="/login", status_code=303)
 
-    export_limit = min(max(int(limit or 1000), 1), 5000)
+    limit_raw = (limit or "").strip().lower()
+    use_all = bool(show_all) or limit_raw in {"0", "all", "全部"}
+    if use_all:
+        export_limit = None
+    else:
+        export_limit = min(max(int(limit or 1000), 1), 5000)
     sort_dir = (sort_dir or "asc").lower()
     if sort_dir not in {"asc", "desc"}:
         sort_dir = "asc"
+
+    time_column = (time_column or "").strip()
+    store_column = (store_column or "").strip()
+    time_start = parse_optional_date(time_start)
+    time_end = parse_optional_date(time_end)
+    store_code = (store_code or "").strip() or None
 
     try:
         if kind == "preview_table" and table_name:
@@ -671,9 +717,38 @@ def export_csv(
             allowed_columns = get_relation_columns(table_name)
             if sort_by and sort_by not in allowed_columns:
                 raise ValueError("排序字段不存在")
+            if not time_column:
+                time_column = resolve_default_column(allowed_columns, DEFAULT_TIME_COLUMNS)
+            if not store_column and "store_code" in allowed_columns:
+                store_column = "store_code"
+            if time_column and time_column not in allowed_columns:
+                raise ValueError("时间筛选字段不存在")
+            if store_column and store_column not in allowed_columns:
+                raise ValueError("店铺筛选字段不存在")
+
+            filters = []
+            params: List[Any] = []
+            if store_code and store_column:
+                filters.append(f"{store_column} = %s")
+                params.append(store_code)
+            if (time_start or time_end) and time_column:
+                if time_start:
+                    filters.append(f"{time_column} >= %s")
+                    params.append(time_start)
+                if time_end:
+                    filters.append(f"{time_column} <= %s")
+                    params.append(time_end)
+            where_sql = f" WHERE {' AND '.join(filters)}" if filters else ""
             order_sql = f" ORDER BY {sort_by} {sort_dir}" if sort_by else ""
-            sql = f"SELECT * FROM {table_name}{order_sql} LIMIT %s"
-            columns, rows, _ = run_query_with_limit(sql, (export_limit,), export_limit)
+            sql = f"SELECT * FROM {table_name}{where_sql}{order_sql}"
+            if use_all:
+                columns, rows = run_query_all(sql, tuple(params))
+            else:
+                columns, rows, _ = run_query_with_limit(
+                    f"{sql} LIMIT %s",
+                    tuple(params) + (export_limit,),
+                    export_limit,
+                )
             log_audit(request, "export", f"table={table_name}")
             return build_csv_response(f"{table_name}.csv", columns, rows)
 
@@ -683,9 +758,38 @@ def export_csv(
             allowed_columns = get_relation_columns(view_name)
             if sort_by and sort_by not in allowed_columns:
                 raise ValueError("排序字段不存在")
+            if not time_column:
+                time_column = resolve_default_column(allowed_columns, DEFAULT_TIME_COLUMNS)
+            if not store_column and "store_code" in allowed_columns:
+                store_column = "store_code"
+            if time_column and time_column not in allowed_columns:
+                raise ValueError("时间筛选字段不存在")
+            if store_column and store_column not in allowed_columns:
+                raise ValueError("店铺筛选字段不存在")
+
+            filters = []
+            params = []
+            if store_code and store_column:
+                filters.append(f"{store_column} = %s")
+                params.append(store_code)
+            if (time_start or time_end) and time_column:
+                if time_start:
+                    filters.append(f"{time_column} >= %s")
+                    params.append(time_start)
+                if time_end:
+                    filters.append(f"{time_column} <= %s")
+                    params.append(time_end)
+            where_sql = f" WHERE {' AND '.join(filters)}" if filters else ""
             order_sql = f" ORDER BY {sort_by} {sort_dir}" if sort_by else ""
-            sql = f"SELECT * FROM {view_name}{order_sql} LIMIT %s"
-            columns, rows, _ = run_query_with_limit(sql, (export_limit,), export_limit)
+            sql = f"SELECT * FROM {view_name}{where_sql}{order_sql}"
+            if use_all:
+                columns, rows = run_query_all(sql, tuple(params))
+            else:
+                columns, rows, _ = run_query_with_limit(
+                    f"{sql} LIMIT %s",
+                    tuple(params) + (export_limit,),
+                    export_limit,
+                )
             log_audit(request, "export", f"view={view_name}")
             return build_csv_response(f"{view_name}.csv", columns, rows)
 
@@ -693,8 +797,11 @@ def export_csv(
             allowed, error_msg, clean_sql = validate_readonly_sql(sql_text)
             if not allowed:
                 raise ValueError(error_msg)
-            wrapped = f"SELECT * FROM ({clean_sql}) AS t LIMIT %s"
-            columns, rows, _ = run_query_with_limit(wrapped, (export_limit,), export_limit)
+            if use_all:
+                columns, rows = run_query_all(clean_sql, ())
+            else:
+                wrapped = f"SELECT * FROM ({clean_sql}) AS t LIMIT %s"
+                columns, rows, _ = run_query_with_limit(wrapped, (export_limit,), export_limit)
             log_audit(request, "export", "sql")
             return build_csv_response("query.csv", columns, rows)
 
@@ -712,6 +819,12 @@ def preview_table(
     sort_by: Optional[str] = Form(None),
     sort_dir: Optional[str] = Form("asc"),
     page: Optional[str] = Form("1"),
+    time_column: Optional[str] = Form(None),
+    time_start: Optional[str] = Form(None),
+    time_end: Optional[str] = Form(None),
+    store_column: Optional[str] = Form(None),
+    store_code: Optional[str] = Form(None),
+    show_all: Optional[str] = Form(None),
 ):
     if not is_logged_in(request):
         return RedirectResponse(url="/login", status_code=303)
@@ -726,6 +839,12 @@ def preview_table(
     if sort_dir not in {"asc", "desc"}:
         sort_dir = "asc"
 
+    time_column = (time_column or "").strip()
+    store_column = (store_column or "").strip()
+    time_start = parse_optional_date(time_start)
+    time_end = parse_optional_date(time_end)
+    store_code = (store_code or "").strip() or None
+
     allowed_columns = get_relation_columns(table_name)
     if sort_by and sort_by not in allowed_columns:
         return render_dashboard(
@@ -738,20 +857,101 @@ def preview_table(
                     "pt_sort_by": sort_by,
                     "pt_sort_dir": sort_dir,
                     "pt_page": str(page),
+                    "pt_time_column": time_column,
+                    "pt_time_start": time_start or "",
+                    "pt_time_end": time_end or "",
+                    "pt_store_column": store_column,
+                    "pt_store_code": store_code or "",
+                    "pt_show_all": "1" if show_all else "",
                 },
                 "pt_columns": allowed_columns,
             },
         )
 
+    if not time_column:
+        time_column = resolve_default_column(allowed_columns, DEFAULT_TIME_COLUMNS)
+    if not store_column and "store_code" in allowed_columns:
+        store_column = "store_code"
+
+    if time_column and time_column not in allowed_columns:
+        return render_dashboard(
+            request,
+            {
+                "errors": {"preview_table": "时间筛选字段不存在"},
+                "form": {
+                    "pt_table_name": table_name,
+                    "pt_limit": str(limit),
+                    "pt_sort_by": sort_by,
+                    "pt_sort_dir": sort_dir,
+                    "pt_page": str(page),
+                    "pt_time_column": time_column,
+                    "pt_time_start": time_start or "",
+                    "pt_time_end": time_end or "",
+                    "pt_store_column": store_column,
+                    "pt_store_code": store_code or "",
+                    "pt_show_all": "1" if show_all else "",
+                },
+                "pt_columns": allowed_columns,
+            },
+        )
+
+    if store_column and store_column not in allowed_columns:
+        return render_dashboard(
+            request,
+            {
+                "errors": {"preview_table": "店铺筛选字段不存在"},
+                "form": {
+                    "pt_table_name": table_name,
+                    "pt_limit": str(limit),
+                    "pt_sort_by": sort_by,
+                    "pt_sort_dir": sort_dir,
+                    "pt_page": str(page),
+                    "pt_time_column": time_column,
+                    "pt_time_start": time_start or "",
+                    "pt_time_end": time_end or "",
+                    "pt_store_column": store_column,
+                    "pt_store_code": store_code or "",
+                    "pt_show_all": "1" if show_all else "",
+                },
+                "pt_columns": allowed_columns,
+            },
+        )
+
+    filters = []
+    params: List[Any] = []
+    if store_code and store_column:
+        filters.append(f"{store_column} = %s")
+        params.append(store_code)
+    if (time_start or time_end) and time_column:
+        if time_start:
+            filters.append(f"{time_column} >= %s")
+            params.append(time_start)
+        if time_end:
+            filters.append(f"{time_column} <= %s")
+            params.append(time_end)
+
+    where_sql = f" WHERE {' AND '.join(filters)}" if filters else ""
     order_sql = f" ORDER BY {sort_by} {sort_dir}" if sort_by else ""
     offset = (page - 1) * limit
-    count_sql = f"SELECT COUNT(*) FROM {table_name}"
-    count_columns, count_rows, _ = run_query_with_limit(count_sql, (), 1)
+    count_sql = f"SELECT COUNT(*) FROM {table_name}{where_sql}"
+    count_columns, count_rows, _ = run_query_with_limit(count_sql, tuple(params), 1)
     total_count = count_rows[0][0] if count_rows else 0
     total_pages = max((total_count + limit - 1) // limit, 1)
-    sql = f"SELECT * FROM {table_name}{order_sql} LIMIT %s OFFSET %s"
+    if show_all:
+        limit = max(total_count, 1)
+    sql = f"SELECT * FROM {table_name}{where_sql}{order_sql}"
     try:
-        columns, rows, has_more = run_query_with_limit(sql, (limit, offset), limit)
+        if show_all:
+            columns, rows = run_query_all(sql, tuple(params))
+            has_more = False
+            total_pages = 1
+            page = 1
+        else:
+            columns, rows, has_more = run_query_with_limit(
+                f"{sql} LIMIT %s OFFSET %s",
+                tuple(params) + (limit, offset),
+                limit,
+            )
         log_audit(request, "preview_table", f"table={table_name}")
         next_page = page + 1 if page < total_pages else None
         prev_page = page - 1 if page > 1 else None
@@ -772,6 +972,12 @@ def preview_table(
                     "pt_sort_by": sort_by,
                     "pt_sort_dir": sort_dir,
                     "pt_page": str(page),
+                    "pt_time_column": time_column,
+                    "pt_time_start": time_start or "",
+                    "pt_time_end": time_end or "",
+                    "pt_store_column": store_column,
+                    "pt_store_code": store_code or "",
+                    "pt_show_all": "1" if show_all else "",
                     "pager_prev_action": "/tool/preview-table" if prev_page else "",
                     "pager_prev_fields": {
                         "table_name": table_name,
@@ -779,6 +985,12 @@ def preview_table(
                         "sort_by": sort_by,
                         "sort_dir": sort_dir,
                         "page": str(prev_page) if prev_page else "",
+                        "time_column": time_column,
+                        "time_start": time_start or "",
+                        "time_end": time_end or "",
+                        "store_column": store_column,
+                        "store_code": store_code or "",
+                        "show_all": "1" if show_all else "",
                     } if prev_page else {},
                     "pager_next_action": "/tool/preview-table" if next_page else "",
                     "pager_next_fields": {
@@ -787,6 +999,12 @@ def preview_table(
                         "sort_by": sort_by,
                         "sort_dir": sort_dir,
                         "page": str(next_page) if next_page else "",
+                        "time_column": time_column,
+                        "time_start": time_start or "",
+                        "time_end": time_end or "",
+                        "store_column": store_column,
+                        "store_code": store_code or "",
+                        "show_all": "1" if show_all else "",
                     } if next_page else {},
                     "pager_jump_action": "/tool/preview-table",
                     "pager_jump_fields": {
@@ -794,6 +1012,12 @@ def preview_table(
                         "limit": str(limit),
                         "sort_by": sort_by,
                         "sort_dir": sort_dir,
+                        "time_column": time_column,
+                        "time_start": time_start or "",
+                        "time_end": time_end or "",
+                        "store_column": store_column,
+                        "store_code": store_code or "",
+                        "show_all": "1" if show_all else "",
                     },
                 },
                 "pt_columns": allowed_columns,
@@ -812,6 +1036,12 @@ def preview_view(
     sort_by: Optional[str] = Form(None),
     sort_dir: Optional[str] = Form("asc"),
     page: Optional[str] = Form("1"),
+    time_column: Optional[str] = Form(None),
+    time_start: Optional[str] = Form(None),
+    time_end: Optional[str] = Form(None),
+    store_column: Optional[str] = Form(None),
+    store_code: Optional[str] = Form(None),
+    show_all: Optional[str] = Form(None),
 ):
     if not is_logged_in(request):
         return RedirectResponse(url="/login", status_code=303)
@@ -826,6 +1056,12 @@ def preview_view(
     if sort_dir not in {"asc", "desc"}:
         sort_dir = "asc"
 
+    time_column = (time_column or "").strip()
+    store_column = (store_column or "").strip()
+    time_start = parse_optional_date(time_start)
+    time_end = parse_optional_date(time_end)
+    store_code = (store_code or "").strip() or None
+
     allowed_columns = get_relation_columns(view_name)
     if sort_by and sort_by not in allowed_columns:
         return render_dashboard(
@@ -838,20 +1074,101 @@ def preview_view(
                     "pv_sort_by": sort_by,
                     "pv_sort_dir": sort_dir,
                     "pv_page": str(page),
+                    "pv_time_column": time_column,
+                    "pv_time_start": time_start or "",
+                    "pv_time_end": time_end or "",
+                    "pv_store_column": store_column,
+                    "pv_store_code": store_code or "",
+                    "pv_show_all": "1" if show_all else "",
                 },
                 "pv_columns": allowed_columns,
             },
         )
 
+    if not time_column:
+        time_column = resolve_default_column(allowed_columns, DEFAULT_TIME_COLUMNS)
+    if not store_column and "store_code" in allowed_columns:
+        store_column = "store_code"
+
+    if time_column and time_column not in allowed_columns:
+        return render_dashboard(
+            request,
+            {
+                "errors": {"preview_view": "时间筛选字段不存在"},
+                "form": {
+                    "pv_view_name": view_name,
+                    "pv_limit": str(limit),
+                    "pv_sort_by": sort_by,
+                    "pv_sort_dir": sort_dir,
+                    "pv_page": str(page),
+                    "pv_time_column": time_column,
+                    "pv_time_start": time_start or "",
+                    "pv_time_end": time_end or "",
+                    "pv_store_column": store_column,
+                    "pv_store_code": store_code or "",
+                    "pv_show_all": "1" if show_all else "",
+                },
+                "pv_columns": allowed_columns,
+            },
+        )
+
+    if store_column and store_column not in allowed_columns:
+        return render_dashboard(
+            request,
+            {
+                "errors": {"preview_view": "店铺筛选字段不存在"},
+                "form": {
+                    "pv_view_name": view_name,
+                    "pv_limit": str(limit),
+                    "pv_sort_by": sort_by,
+                    "pv_sort_dir": sort_dir,
+                    "pv_page": str(page),
+                    "pv_time_column": time_column,
+                    "pv_time_start": time_start or "",
+                    "pv_time_end": time_end or "",
+                    "pv_store_column": store_column,
+                    "pv_store_code": store_code or "",
+                    "pv_show_all": "1" if show_all else "",
+                },
+                "pv_columns": allowed_columns,
+            },
+        )
+
+    filters = []
+    params: List[Any] = []
+    if store_code and store_column:
+        filters.append(f"{store_column} = %s")
+        params.append(store_code)
+    if (time_start or time_end) and time_column:
+        if time_start:
+            filters.append(f"{time_column} >= %s")
+            params.append(time_start)
+        if time_end:
+            filters.append(f"{time_column} <= %s")
+            params.append(time_end)
+
+    where_sql = f" WHERE {' AND '.join(filters)}" if filters else ""
     order_sql = f" ORDER BY {sort_by} {sort_dir}" if sort_by else ""
     offset = (page - 1) * limit
-    count_sql = f"SELECT COUNT(*) FROM {view_name}"
-    count_columns, count_rows, _ = run_query_with_limit(count_sql, (), 1)
+    count_sql = f"SELECT COUNT(*) FROM {view_name}{where_sql}"
+    count_columns, count_rows, _ = run_query_with_limit(count_sql, tuple(params), 1)
     total_count = count_rows[0][0] if count_rows else 0
     total_pages = max((total_count + limit - 1) // limit, 1)
-    sql = f"SELECT * FROM {view_name}{order_sql} LIMIT %s OFFSET %s"
+    if show_all:
+        limit = max(total_count, 1)
+    sql = f"SELECT * FROM {view_name}{where_sql}{order_sql}"
     try:
-        columns, rows, has_more = run_query_with_limit(sql, (limit, offset), limit)
+        if show_all:
+            columns, rows = run_query_all(sql, tuple(params))
+            has_more = False
+            total_pages = 1
+            page = 1
+        else:
+            columns, rows, has_more = run_query_with_limit(
+                f"{sql} LIMIT %s OFFSET %s",
+                tuple(params) + (limit, offset),
+                limit,
+            )
         log_audit(request, "preview_view", f"view={view_name}")
         next_page = page + 1 if page < total_pages else None
         prev_page = page - 1 if page > 1 else None
@@ -872,6 +1189,12 @@ def preview_view(
                     "pv_sort_by": sort_by,
                     "pv_sort_dir": sort_dir,
                     "pv_page": str(page),
+                    "pv_time_column": time_column,
+                    "pv_time_start": time_start or "",
+                    "pv_time_end": time_end or "",
+                    "pv_store_column": store_column,
+                    "pv_store_code": store_code or "",
+                    "pv_show_all": "1" if show_all else "",
                     "pager_prev_action": "/tool/preview-view" if prev_page else "",
                     "pager_prev_fields": {
                         "view_name": view_name,
@@ -879,6 +1202,12 @@ def preview_view(
                         "sort_by": sort_by,
                         "sort_dir": sort_dir,
                         "page": str(prev_page) if prev_page else "",
+                        "time_column": time_column,
+                        "time_start": time_start or "",
+                        "time_end": time_end or "",
+                        "store_column": store_column,
+                        "store_code": store_code or "",
+                        "show_all": "1" if show_all else "",
                     } if prev_page else {},
                     "pager_next_action": "/tool/preview-view" if next_page else "",
                     "pager_next_fields": {
@@ -887,6 +1216,12 @@ def preview_view(
                         "sort_by": sort_by,
                         "sort_dir": sort_dir,
                         "page": str(next_page) if next_page else "",
+                        "time_column": time_column,
+                        "time_start": time_start or "",
+                        "time_end": time_end or "",
+                        "store_column": store_column,
+                        "store_code": store_code or "",
+                        "show_all": "1" if show_all else "",
                     } if next_page else {},
                     "pager_jump_action": "/tool/preview-view",
                     "pager_jump_fields": {
@@ -894,6 +1229,12 @@ def preview_view(
                         "limit": str(limit),
                         "sort_by": sort_by,
                         "sort_dir": sort_dir,
+                        "time_column": time_column,
+                        "time_start": time_start or "",
+                        "time_end": time_end or "",
+                        "store_column": store_column,
+                        "store_code": store_code or "",
+                        "show_all": "1" if show_all else "",
                     },
                 },
                 "pv_columns": allowed_columns,
