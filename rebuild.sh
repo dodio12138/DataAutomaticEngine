@@ -21,8 +21,8 @@ show_help() {
 
 参数：
   服务名             要重构的服务名称（多个用空格分隔）
-                     可用服务：api, crawler, etl, feishu-sync, scheduler, db
-                     省略则重构所有主要服务（db, api, scheduler）
+                     可用服务：api, crawler, etl, feishu-sync, scheduler, db, sql_ui, superset
+                     省略则重构所有主要服务（db, api, scheduler, sql_ui, superset）
 
 注意：
   - crawler、etl 和 feishu-sync 镜像会自动重构（无论是否指定）
@@ -77,8 +77,8 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # 可用服务列表
-AVAILABLE_SERVICES=("api" "crawler" "etl" "feishu-sync" "scheduler" "db")
-ALL_SERVICES=("db" "api" "scheduler")  # 默认重构的服务（需构建的）
+AVAILABLE_SERVICES=("api" "crawler" "etl" "feishu-sync" "scheduler" "db" "sql_ui" "superset")
+ALL_SERVICES=("db" "api" "scheduler" "sql_ui" "superset")  # 默认重构的服务（需构建的）
 
 # 解析参数
 CLEAN_IMAGES=false
@@ -193,7 +193,7 @@ if [ "$CLEAN_IMAGES" = true ]; then
     done
     
     for service in "${SERVICES_TO_REBUILD[@]}"; do
-        if [ "$service" = "db" ]; then
+        if [ "$service" = "db" ] || [ "$service" = "superset" ]; then
             echo -e "${YELLOW}⏭️  跳过 db 镜像（使用官方镜像）${NC}"
             continue
         fi
@@ -243,10 +243,10 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${CYAN}步骤 ${STEP_BUILD}: 重新构建镜像${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-# 需要构建的服务（不包括 db，因为 db 使用官方镜像）
+# 需要构建的服务（不包括 db/superset，因为使用官方镜像）
 BUILD_SERVICES=()
 for service in "${SERVICES_TO_REBUILD[@]}"; do
-    if [ "$service" != "db" ]; then
+    if [ "$service" != "db" ] && [ "$service" != "superset" ]; then
         BUILD_SERVICES+=("$service")
     fi
 done
