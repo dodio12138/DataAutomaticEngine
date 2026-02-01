@@ -9,8 +9,8 @@ CREATE OR REPLACE FUNCTION raw_orders_keyword_count(
 RETURNS BIGINT
 LANGUAGE SQL
 AS $$
-    WITH filtered_orders AS (
-        SELECT payload
+    WITH base_orders AS (
+        SELECT platform, payload
         FROM raw_orders
         WHERE (
             COALESCE(order_date::date, created_at::date) BETWEEN
@@ -28,19 +28,24 @@ AS $$
         )
         AND payload::text ILIKE ('%' || p_keyword || '%')
     ),
-    item_objects AS (
+    panda_orders AS (
+        SELECT payload
+        FROM base_orders
+        WHERE platform = 'panda'
+    ),
+    panda_item_objects AS (
         SELECT jsonb_path_query(payload, '$.data.details[*]') AS item
-        FROM filtered_orders
+        FROM panda_orders
         WHERE payload ? 'data' AND (payload->'data') ? 'details'
         UNION ALL
         SELECT jsonb_path_query(
             payload,
             '$.** ? (@.productCount != null || @.quantity != null || @.qty != null)'
         ) AS item
-        FROM filtered_orders
+        FROM panda_orders
         WHERE NOT (payload ? 'data' AND (payload->'data') ? 'details')
     ),
-    item_fields AS (
+    panda_item_fields AS (
         SELECT
             COALESCE(
                 item->>'productName',
@@ -54,9 +59,9 @@ AS $$
                 NULLIF(item->>'qty', '')::int,
                 1
             ) AS product_count
-        FROM item_objects
+        FROM panda_item_objects
     ),
-    matched AS (
+    panda_matched AS (
         SELECT
             item_name,
             product_count,
@@ -77,9 +82,21 @@ AS $$
                     1
                 )
             END AS name_multiplier
-        FROM item_fields
+        FROM panda_item_fields
+    ),
+    panda_total AS (
+        SELECT COALESCE(SUM(product_count * name_multiplier), 0)::bigint AS cnt
+        FROM panda_matched
+        WHERE name_multiplier > 0
+    ),
+    other_total AS (
+        SELECT COUNT(*)::bigint AS cnt
+        FROM base_orders
+        WHERE platform <> 'panda'
     )
-    SELECT COALESCE(SUM(product_count * name_multiplier), 0)::bigint
-    FROM matched
-    WHERE name_multiplier > 0;
+    SELECT CASE
+        WHEN p_platform = 'panda' THEN (SELECT cnt FROM panda_total)
+        WHEN p_platform IS NULL THEN (SELECT cnt FROM panda_total) + (SELECT cnt FROM other_total)
+        ELSE (SELECT cnt FROM other_total)
+    END;
 $$;
