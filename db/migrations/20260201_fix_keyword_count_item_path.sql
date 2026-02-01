@@ -1,4 +1,4 @@
--- 修正关键词统计：避免 panda payload 多路径重复计数
+-- 修正关键词统计：避免 panda payload 多路径重复计数（触发同步更新）
 CREATE OR REPLACE FUNCTION raw_orders_keyword_count(
     p_keyword TEXT,
     p_start_date DATE DEFAULT NULL,
