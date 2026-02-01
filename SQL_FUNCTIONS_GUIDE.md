@@ -4,7 +4,12 @@
 
 ## 1) raw_orders_keyword_count
 
-**用途**：统计 `raw_orders.payload` 中包含指定关键词的记录数量，支持平台/店铺筛选，日期不传默认本月。
+**用途**：统计 `raw_orders.payload` 中包含指定关键词的商品数量，支持平台/店铺筛选，日期不传默认本月。
+
+**计数规则**：
+- 从 payload 中提取商品明细对象（包含 `productCount/quantity/qty` 字段）
+- 在商品名中匹配关键词，并抓取关键词后出现的第一个 `Xn`（如 `x2`）作为倍数
+- 最终数量 = `Xn`（无则为 1）× `productCount`（无则为 1）
 
 **签名**：
 ```sql
