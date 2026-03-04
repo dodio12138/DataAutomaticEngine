@@ -19,9 +19,9 @@ store_login_user = {
     "海底捞冒菜（东伦敦）": "8888888888",
     "海底捞冒菜（巴特西）": "8888888888",
     "海底捞冒菜（Brent）": "8888888888",
-    "海底捞冒菜（塔桥）": "7346357000",
+    "海底捞冒菜（塔桥）": "8888888888",
     "海底捞火锅（Piccadilly）东区专送": "8888888888",
-    "海底捞火锅（Tower Bridge）": "7346357000",
+    "海底捞火锅（Tower Bridge）": "8888888888",
 }
 
 store_login_password = {
@@ -30,9 +30,9 @@ store_login_password = {
     "海底捞冒菜（东伦敦）": "q26PU5Qr0",
     "海底捞冒菜（巴特西）": "q26PU5Qr0",
     "海底捞冒菜（Brent）": "q26PU5Qr0",
-    "海底捞冒菜（塔桥）": "hdl12345",
+    "海底捞冒菜（塔桥）": "q26PU5Qr0",
     "海底捞火锅（Piccadilly）东区专送": "q26PU5Qr0",
-    "海底捞火锅（Tower Bridge）": "hdl12345",
+    "海底捞火锅（Tower Bridge）": "q26PU5Qr0",
 }
 
 store_dict_deliveroo = {
