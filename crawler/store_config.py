@@ -26,7 +26,7 @@ store_login_user = {
 
 store_login_password = {
     "海底捞火锅（Piccadilly）": "q26PU5Qr0",
-    "海底捞冒菜（Piccadilly）": "q26PU5Qr0",
+    "海底捞冒菜（Piccadilly）": "80eKe2dow",
     "海底捞冒菜（东伦敦）": "q26PU5Qr0",
     "海底捞冒菜（巴特西）": "q26PU5Qr0",
     "海底捞冒菜（Brent）": "q26PU5Qr0",

@@ -137,6 +137,8 @@ class HungryPandaScraper:
 
     def scrape_orders(self):
         self.login()
+
+        # 店铺列表中点击对应 store_id 进入订单页。
         self.driver.get("https://merchant-uk.hungrypanda.co/master/branchStore/storeList")
         btn = self.wait.until(EC.presence_of_element_located(
             (By.XPATH, f'//tr[@data-row-key="{self.store_id}"]//button')

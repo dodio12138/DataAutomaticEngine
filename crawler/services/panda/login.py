@@ -32,8 +32,7 @@ def do_login(driver, wait, phone: str, password: str):
     driver.get("https://merchant-uk.hungrypanda.co/master/login")
     wait.until(EC.presence_of_element_located(SELECTORS["login_phone"])).send_keys(phone)
     driver.find_element(*SELECTORS["login_password"]).send_keys(password)
-    wait.until(EC.element_to_be_clickable(SELECTORS["login_button_xpath"]) ) .click()
-    # wait for branch management to appear as login success signal
+    wait.until(EC.element_to_be_clickable(SELECTORS["login_button_xpath"])).click()
     wait.until(EC.presence_of_element_located(SELECTORS["branch_management_text"]))
     # small wait to ensure session cookies stabilized
     time.sleep(0.3)
