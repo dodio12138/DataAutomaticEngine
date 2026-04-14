@@ -8,8 +8,9 @@ Deliveroo 每日销售汇总（一次登录，复用会话）
 import os
 import time
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
+from zoneinfo import ZoneInfo
 
 import psycopg2
 import requests
@@ -23,6 +24,20 @@ from store_config import store_code_map, store_dict_deliveroo
 SUMMARY_URL = "https://partner-hub.deliveroo.com/api-gw/sales/v2/summary"
 ORG_ID = os.getenv("DELIVEROO_ORG_ID", "526324")
 MARKET = os.getenv("DELIVEROO_MARKET", "GB")
+LONDON_TZ = ZoneInfo("Europe/London")
+
+
+def _build_utc_day_range(date_str: str) -> tuple[str, str]:
+    """将英国本地自然日转换为 UTC 时间区间（ISO-8601 + Z）。"""
+    day = datetime.strptime(date_str, "%Y-%m-%d")
+    local_start = day.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=LONDON_TZ)
+    local_end = day.replace(hour=23, minute=59, second=59, microsecond=999000, tzinfo=LONDON_TZ)
+
+    utc_start = local_start.astimezone(timezone.utc)
+    utc_end = local_end.astimezone(timezone.utc)
+    from_iso = utc_start.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    to_iso = utc_end.strftime("%Y-%m-%dT%H:%M:%S.%f")[:23] + "Z"
+    return from_iso, to_iso
 
 
 def _setup_session_like_orders(driver) -> tuple[requests.Session, dict]:
@@ -91,10 +106,11 @@ def _extract_restaurant_drn_id(driver) -> str | None:
 
 
 def _fetch_one_day(session: requests.Session, branch_drn_id: str, date_str: str, headers: dict) -> dict | None:
+    from_iso, to_iso = _build_utc_day_range(date_str)
     payload = {
         "branch_drn_ids": [branch_drn_id],
-        "from": f"{date_str}T00:00:00.000Z",
-        "to": f"{date_str}T23:59:59.999Z",
+        "from": from_iso,
+        "to": to_iso,
         "market": MARKET,
         "payment_type": "all",
     }
